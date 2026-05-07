@@ -267,6 +267,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Log the scan result for UI notifications
+    await supabase.from("scan_logs").insert({
+      prospects_found: discovered.length,
+      headlines_processed: allHeadlines.length,
+      method: usingSerp ? "serpapi" : "ai-fallback",
+    });
+
     return new Response(
       JSON.stringify({
         discovered: discovered.length,

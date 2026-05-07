@@ -185,7 +185,7 @@ function DiscoveryPanel({ discovered, onClose }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
           <Sparkles size={20} style={{ color: 'var(--amber)' }} />
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text1)', flex: 1 }}>Auto-Discovered in Last 24h</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text1)', flex: 1 }}>Auto-Discovered in Last 7 Days</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
         </div>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 22, lineHeight: 1.6 }}>
@@ -225,7 +225,7 @@ function DiscoveryPanel({ discovered, onClose }) {
           })}
           {discovered.length === 0 && (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)', fontSize: 14 }}>
-              No companies auto-discovered in the last 24h.<br />
+              No companies auto-discovered in the last 7 days.<br />
               <span style={{ fontSize: 12 }}>Click "Discover" to run a scan now.</span>
             </div>
           )}
@@ -307,10 +307,10 @@ export default function RadarPage() {
     fetchEvents()
   }, [])
 
-  // ── Fetch + subscribe to auto-discovered prospects (last 24h) ──
+  // ── Fetch + subscribe to auto-discovered prospects (last 7 days) ──
   useEffect(() => {
     async function fetchDiscovered() {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
       const { data } = await supabase
         .from('prospects')
         .select('id, name, discovery_source, discovery_headline, created_at, intent_score, sector')
@@ -335,8 +335,49 @@ export default function RadarPage() {
     return () => supabase.removeChannel(channel)
   }, [])
 
+  // ── Subscribe to background auto-scan notifications ──────────
+  useEffect(() => {
+    const channel = supabase
+      .channel('scan-logs-notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'scan_logs'
+      }, (payload) => {
+        const { prospects_found, headlines_processed } = payload.new
+        if (prospects_found > 0) {
+          addToast(`🤖 Auto-scan complete: Found ${prospects_found} new companies out of ${headlines_processed} headlines!`, 'success')
+        } else {
+          addToast(`🤖 Auto-scan complete: No new companies found in ${headlines_processed} headlines.`, 'info')
+        }
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [addToast])
+
   // ── Manually trigger full auto-discovery (Option B) ─────────────
   const [isDiscovering, setIsDiscovering] = useState(false)
+  const [scanFrequency, setScanFrequency] = useState('manual')
+
+  const handleFrequencyChange = async (e) => {
+    const freq = e.target.value
+    setScanFrequency(freq)
+    addToast(`Updating schedule to: ${freq === 'manual' ? 'Manual' : freq === '2x' ? '2 times a day' : '4 times a day'}`, 'info')
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-cron`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ frequency: freq })
+      })
+      if (!res.ok) throw new Error('Failed to update schedule')
+      addToast('Scan schedule updated successfully', 'success')
+    } catch (err) {
+      addToast(err.message, 'error')
+      setScanFrequency('manual') // revert on error
+    }
+  }
+
   const handleRunDiscovery = async () => {
     setIsDiscovering(true)
     addToast('🔍 Auto-discovery started — scanning Inc42, ETBFSI…', 'info')
@@ -495,7 +536,7 @@ export default function RadarPage() {
           <Pencil size={14} /> Edit ICP
         </button>
 
-        {/* ✨ Discovery badge — auto-discovered in last 24h */}
+        {/* ✨ Discovery badge — auto-discovered in last 7 days */}
         {unvalidatedProspects.length > 0 && (
           <button
             onClick={() => setShowReviewModal(true)}
@@ -512,6 +553,21 @@ export default function RadarPage() {
           </button>
         )}
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '2px 2px 2px 10px' }}>
+          <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Auto-Scan</span>
+          <select 
+            value={scanFrequency} 
+            onChange={handleFrequencyChange}
+            style={{
+              background: 'transparent', border: 'none', color: 'var(--text1)', fontSize: 12, outline: 'none', cursor: 'pointer', padding: '4px 6px'
+            }}
+          >
+            <option value="manual" style={{ background: 'var(--bg1)' }}>Manual</option>
+            <option value="2x" style={{ background: 'var(--bg1)' }}>2x a Day</option>
+            <option value="4x" style={{ background: 'var(--bg1)' }}>4x a Day</option>
+          </select>
+        </div>
+
         {/* 🔍 Discover Now — triggers full auto-discovery pipeline */}
         <button
           onClick={handleRunDiscovery}
@@ -523,11 +579,11 @@ export default function RadarPage() {
             border: '1px solid rgba(123,110,255,0.35)',
             background: 'rgba(123,110,255,0.08)', color: '#A99FFF',
             opacity: isDiscovering ? 0.7 : 1, transition: 'all 0.2s',
-            height: 42, whiteSpace: 'nowrap',
+            height: 40, whiteSpace: 'nowrap',
           }}
         >
           {isDiscovering ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          {isDiscovering ? 'Discovering…' : 'Discover'}
+          {isDiscovering ? 'Discovering…' : 'Discover Now'}
         </button>
 
         {/* 🔥 SCAN ALL — Dedicated Real-Time Scan Button */}
@@ -586,6 +642,43 @@ export default function RadarPage() {
           </div>
         ) : (
           <>
+            {/* ── 1-Week Recent Companies Tier ── */}
+            {unvalidatedProspects.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Sparkles size={14} style={{ color: 'var(--amber)' }} />
+                  Freshly Discovered (Last 7 Days)
+                </div>
+                <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, paddingTop: 4 }}>
+                  {unvalidatedProspects.map(p => (
+                    <div key={p.id} className="glass" style={{
+                      minWidth: 260, padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
+                      background: 'rgba(255, 179, 64, 0.03)', borderColor: 'rgba(255, 179, 64, 0.15)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 34, height: 34, borderRadius: 8, background: 'rgba(255,180,0,0.1)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 12, fontWeight: 700, color: 'var(--amber)', flexShrink: 0
+                        }}>
+                          {p.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{p.sector || 'Fintech'}</div>
+                        </div>
+                        {p.intent_score != null && (
+                          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-mono)', color: p.intent_score > 75 ? 'var(--teal)' : p.intent_score >= 50 ? 'var(--amber)' : 'var(--text3)' }}>
+                            {p.intent_score}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {hotLeads.length > 0 && (
               <>
                 <div className="section-label">Hot Leads · Score &gt; 75</div>
