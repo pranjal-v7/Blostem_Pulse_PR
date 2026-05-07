@@ -71,6 +71,8 @@ export default function CompanyDetailPage() {
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [dynamicContactInfo, setDynamicContactInfo] = useState(null)
+  const [fetchingContactInfo, setFetchingContactInfo] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -84,12 +86,35 @@ export default function CompanyDetailPage() {
         const { data: events } = await supabase.from('macro_events').select('*')
           .contains('sector_impact', [cRes.data.sector]).eq('is_active', true)
         setMacroEvents(events || [])
+        
+        // Fetch real contact info if not hardcoded
+        if (!CONTACT_INFO[cRes.data.name]) {
+          fetchContactInfo(cRes.data.name)
+        }
       }
       setSignals(sRes.data || [])
       setLoading(false)
     }
     fetchData()
   }, [id])
+
+  const fetchContactInfo = async (companyName) => {
+    setFetchingContactInfo(true)
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-contact-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_name: companyName })
+      })
+      const data = await res.json()
+      if (data && !data.error) {
+        setDynamicContactInfo(data)
+      }
+    } catch (err) {
+      console.warn("Failed to fetch contact info:", err)
+    }
+    setFetchingContactInfo(false)
+  }
 
   const handleDeepScan = async () => {
     setScanning(true)
@@ -193,8 +218,19 @@ export default function CompanyDetailPage() {
 
       {/* Contact Info */}
       {(() => {
-        const ci = CONTACT_INFO[company.name]
-        if (!ci) return null
+        const ci = CONTACT_INFO[company.name] || dynamicContactInfo
+        if (!ci && !fetchingContactInfo) return null
+        
+        if (fetchingContactInfo) {
+          return (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+              className="glass" style={{ borderRadius: 14, padding: 24, marginBottom: 28, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Loader2 size={18} className="animate-spin" style={{ color: 'var(--teal)' }} />
+              <span style={{ fontSize: 14, color: 'var(--text2)' }}>Autonomously retrieving executive contacts and website domains...</span>
+            </motion.div>
+          )
+        }
+
         return (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
             className="glass" style={{ borderRadius: 14, padding: 24, marginBottom: 28 }}>
@@ -204,7 +240,7 @@ export default function CompanyDetailPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
               {ci.cto && (
                 <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(0,212,164,0.04)', border: '1px solid rgba(0,212,164,0.1)' }}>
-                  <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>CTO</div>
+                  <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Executive (Tech/Ops)</div>
                   <div style={{ fontSize: 14, color: '#ffffff', fontWeight: 500, marginBottom: 4 }}>{ci.cto}</div>
                   <a href={`mailto:${ci.ctoEmail}`} style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <AtSign size={12} /> {ci.ctoEmail}
@@ -213,7 +249,7 @@ export default function CompanyDetailPage() {
               )}
               {ci.cfo && (
                 <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(123,110,255,0.04)', border: '1px solid rgba(123,110,255,0.1)' }}>
-                  <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>CFO</div>
+                  <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Executive (Finance)</div>
                   <div style={{ fontSize: 14, color: '#ffffff', fontWeight: 500, marginBottom: 4 }}>{ci.cfo}</div>
                   <a href={`mailto:${ci.cfoEmail}`} style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <AtSign size={12} /> {ci.cfoEmail}
@@ -229,12 +265,21 @@ export default function CompanyDetailPage() {
               <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Links</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <a href={ci.linkedin} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <Linkedin size={12} /> LinkedIn Page
-                  </a>
-                  <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <Link2 size={12} /> {company.website}
-                  </a>
+                  {ci.linkedin && (
+                    <a href={ci.linkedin} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Linkedin size={12} /> LinkedIn Page
+                    </a>
+                  )}
+                  {ci.website && (
+                    <a href={`https://${ci.website.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Link2 size={12} /> {ci.website.replace(/^https?:\/\//, '')}
+                    </a>
+                  )}
+                  {company.website && !ci.website && (
+                    <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Link2 size={12} /> {company.website}
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

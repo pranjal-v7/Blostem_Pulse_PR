@@ -651,10 +651,15 @@ export default function RadarPage() {
                 </div>
                 <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, paddingTop: 4 }}>
                   {unvalidatedProspects.map(p => (
-                    <div key={p.id} className="glass" style={{
-                      minWidth: 260, padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
-                      background: 'rgba(255, 179, 64, 0.03)', borderColor: 'rgba(255, 179, 64, 0.15)'
-                    }}>
+                    <div 
+                      key={p.id} 
+                      className="glass prospect-card" 
+                      onClick={() => navigate(`/app/company/${p.id}`)}
+                      style={{
+                        minWidth: 260, padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
+                        background: 'rgba(255, 179, 64, 0.03)', borderColor: 'rgba(255, 179, 64, 0.15)',
+                        cursor: 'pointer', transition: 'all 0.2s ease-in-out'
+                      }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{
                           width: 34, height: 34, borderRadius: 8, background: 'rgba(255,180,0,0.1)',
