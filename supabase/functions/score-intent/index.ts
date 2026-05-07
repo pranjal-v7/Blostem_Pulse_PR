@@ -91,8 +91,10 @@ Deno.serve(async (req) => {
           intent_score: result.score,
           alignment_reason: result.reason,
           signal_weights: result.signal_weights,
+          ai_analysis: result.ai_analysis ?? null,
         })
         .eq("id", company.id);
+
 
       results.push({ company_id: company.id, name: company.name, ...result });
     }

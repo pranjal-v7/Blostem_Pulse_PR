@@ -40,14 +40,34 @@ export function useRealtimeProspects() {
         }
       })
 
-      // Merge
+      // Merge signals into prospects
       const merged = prospectsData.map(p => ({
         ...p,
         signal_count: signalMap[p.id]?.count || 0,
         last_signal_at: signalMap[p.id]?.latest || null,
       }))
 
-      setProspects(merged)
+      // Deduplicate by name — keep the row with highest intent_score, or most signals as tiebreaker.
+      // This prevents duplicates caused by concurrent seed inserts from showing anywhere in the UI.
+      const nameMap = new Map()
+      for (const p of merged) {
+        const key = p.name.toLowerCase().trim()
+        const existing = nameMap.get(key)
+        if (!existing) {
+          nameMap.set(key, p)
+        } else {
+          // Prefer higher intent_score; if tied, prefer more signals
+          const existingScore = existing.intent_score ?? -1
+          const newScore = p.intent_score ?? -1
+          if (newScore > existingScore || (newScore === existingScore && p.signal_count > existing.signal_count)) {
+            nameMap.set(key, p)
+          }
+        }
+      }
+      const deduped = Array.from(nameMap.values()).sort((a, b) => (b.intent_score ?? 0) - (a.intent_score ?? 0))
+
+      setProspects(deduped)
+
       setError(null)
     } catch (err) {
       console.error('Error fetching prospects:', err)

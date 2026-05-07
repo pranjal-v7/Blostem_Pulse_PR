@@ -171,13 +171,24 @@ ${ctx.signals}
 Active macro events affecting this sector:
 ${ctx.macro_events}
 
+Scoring rules:
+- 75-100 (HOT): Direct regulatory pressure on this company OR sector, fresh funding round (Series A+), compliance hiring signals, product launch requiring KYC/onboarding.
+- 50-74 (WARM): Sector-level regulatory change, company growing but no acute pressure signal, funding 3-6 months ago.
+- 0-49 (COLD): No recent signals, stable/mature compliance posture, pre-seed unlikely to budget for automation.
+- IMPORTANT: Score 95+ only if there are 3+ strong independent signals confirming imminent need. Do NOT assign high scores without clear evidence.
+
 Return ONLY this JSON:
 {
   "score": <integer 0-100>,
   "reason": "<2-3 sentences: what specific signals drive this score and why they indicate buying intent>",
   "signal_weights": [
-    { "headline": "<signal headline>", "weight": <integer points contributed>, "url": "<url if available or empty string>" }
-  ]
+    { "headline": "<signal headline or 'No signals — scored on sector profile and stage'>" , "weight": <integer points contributed>, "url": "<url if available or empty string>" }
+  ],
+  "ai_analysis": {
+    "regulatory_triggers": "<specific RBI/SEBI regulations or circulars currently pressuring this sector, or 'None identified' if none>",
+    "icp_fit": "<assessment of how well this company fits Blostem's ICP: compliance automation buyer profile, scale, and budget likelihood>",
+    "buy_window": "<estimated buy-window: Immediate (0-30 days), Near-term (1-3 months), Medium-term (3-6 months), or Long-term (6+ months), with one-sentence rationale>"
+  }
 }`;
 }
 
