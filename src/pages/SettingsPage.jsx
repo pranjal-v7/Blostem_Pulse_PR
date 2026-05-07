@@ -67,7 +67,20 @@ export default function SettingsPage() {
         avatar_url: avatarUrl,
       })
       if (error) throw error
-      addToast('Settings saved', 'success')
+
+      // Also update the backend cron schedule
+      let freqArg = 'manual'
+      if (profile.scan_frequency === '2x_daily') freqArg = '2x'
+      if (profile.scan_frequency === '4x_daily') freqArg = '4x'
+      
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-cron`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+        body: JSON.stringify({ frequency: freqArg })
+      })
+      if (!res.ok) throw new Error('Failed to update background scan schedule')
+
+      addToast('Settings & schedule saved', 'success')
     } catch (err) {
       addToast(err.message, 'error')
     }

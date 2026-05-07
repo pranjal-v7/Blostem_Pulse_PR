@@ -358,25 +358,7 @@ export default function RadarPage() {
 
   // ── Manually trigger full auto-discovery (Option B) ─────────────
   const [isDiscovering, setIsDiscovering] = useState(false)
-  const [scanFrequency, setScanFrequency] = useState('manual')
 
-  const handleFrequencyChange = async (e) => {
-    const freq = e.target.value
-    setScanFrequency(freq)
-    addToast(`Updating schedule to: ${freq === 'manual' ? 'Manual' : freq === '2x' ? '2 times a day' : '4 times a day'}`, 'info')
-    try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-cron`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ frequency: freq })
-      })
-      if (!res.ok) throw new Error('Failed to update schedule')
-      addToast('Scan schedule updated successfully', 'success')
-    } catch (err) {
-      addToast(err.message, 'error')
-      setScanFrequency('manual') // revert on error
-    }
-  }
 
   const handleRunDiscovery = async () => {
     setIsDiscovering(true)
@@ -520,6 +502,24 @@ export default function RadarPage() {
           <div className="kpi-label">Alerts</div>
           <div className="kpi-val coral"><AnimatedKPI target={visibleEvents.length} /></div>
         </div>
+        <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}>
+          <button
+            onClick={handleRunDiscovery}
+            disabled={isDiscovering}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+              cursor: isDiscovering ? 'not-allowed' : 'pointer',
+              border: '1px solid rgba(123,110,255,0.35)',
+              background: 'rgba(123,110,255,0.08)', color: '#A99FFF',
+              opacity: isDiscovering ? 0.7 : 1, transition: 'all 0.2s',
+              height: 40, whiteSpace: 'nowrap',
+            }}
+          >
+            {isDiscovering ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {isDiscovering ? 'Discovering…' : 'Discover Now'}
+          </button>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -532,10 +532,6 @@ export default function RadarPage() {
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           <div className="search-scan" />
         </div>
-        <button className="icp-btn" onClick={openIcpModal}>
-          <Pencil size={14} /> Edit ICP
-        </button>
-
         {/* ✨ Discovery badge — auto-discovered in last 7 days */}
         {unvalidatedProspects.length > 0 && (
           <button
@@ -552,39 +548,6 @@ export default function RadarPage() {
             {unvalidatedProspects.length} Auto-Discovered
           </button>
         )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '2px 2px 2px 10px' }}>
-          <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Auto-Scan</span>
-          <select 
-            value={scanFrequency} 
-            onChange={handleFrequencyChange}
-            style={{
-              background: 'transparent', border: 'none', color: 'var(--text1)', fontSize: 12, outline: 'none', cursor: 'pointer', padding: '4px 6px'
-            }}
-          >
-            <option value="manual" style={{ background: 'var(--bg1)' }}>Manual</option>
-            <option value="2x" style={{ background: 'var(--bg1)' }}>2x a Day</option>
-            <option value="4x" style={{ background: 'var(--bg1)' }}>4x a Day</option>
-          </select>
-        </div>
-
-        {/* 🔍 Discover Now — triggers full auto-discovery pipeline */}
-        <button
-          onClick={handleRunDiscovery}
-          disabled={isDiscovering}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-            cursor: isDiscovering ? 'not-allowed' : 'pointer',
-            border: '1px solid rgba(123,110,255,0.35)',
-            background: 'rgba(123,110,255,0.08)', color: '#A99FFF',
-            opacity: isDiscovering ? 0.7 : 1, transition: 'all 0.2s',
-            height: 40, whiteSpace: 'nowrap',
-          }}
-        >
-          {isDiscovering ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          {isDiscovering ? 'Discovering…' : 'Discover Now'}
-        </button>
 
         {/* 🔥 SCAN ALL — Dedicated Real-Time Scan Button */}
 
