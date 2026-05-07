@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx vite build",
+  "buildCommand": "chmod +x node_modules/.bin/vite && vite build",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
