@@ -169,114 +169,64 @@ function ProspectCard({ prospect, index, onDeepScan, scanningId }) {
   )
 }
 
-/* ─── Review Modal — Autonomous Discovery ─────────────────── */
-function ReviewModal({ prospects: unvalidated, onClose, onAdd, onSkip, addingId, skippingId }) {
+/* ─── Discovery Panel — Auto-Discovery Timeline (Option B) ── */
+function DiscoveryPanel({ discovered, onClose }) {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 200, padding: 20,
-      }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
         className="glass"
         style={{ width: '100%', maxWidth: 580, borderRadius: 18, padding: 28, maxHeight: '80vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
           <Sparkles size={20} style={{ color: 'var(--amber)' }} />
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text1)', flex: 1 }}>
-            New Prospects Discovered
-          </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}>
-            <X size={18} />
-          </button>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text1)', flex: 1 }}>Auto-Discovered in Last 24h</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
         </div>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 22, lineHeight: 1.6 }}>
-          These company names were extracted from Inc42, ETBFSI, and other feeds.
-          Add them to your pipeline or skip — no manual data entry needed.
+          These companies were autonomously extracted from Inc42, ETBFSI, and other feeds, validated, profiled, and scored — zero manual input.
         </p>
-
-        {/* List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {unvalidated.map(p => (
-            <div key={p.id} style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--border)',
-              borderRadius: 12, padding: '14px 16px',
-              display: 'flex', flexDirection: 'column', gap: 8,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {/* Initials avatar */}
-                <div style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  background: 'rgba(255,180,0,0.1)',
-                  border: '1px solid rgba(255,180,0,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 700, color: 'var(--amber)', flexShrink: 0,
-                }}>
-                  {p.name.slice(0, 2).toUpperCase()}
+          {discovered.map((p, idx) => {
+            const s = Math.floor((Date.now() - new Date(p.created_at)) / 1000)
+            const ago = s < 3600 ? `${Math.floor(s / 60)}m ago` : s < 86400 ? `${Math.floor(s / 3600)}h ago` : `${Math.floor(s / 86400)}d ago`
+            const heat = p.intent_score > 75 ? 'hot' : p.intent_score >= 50 ? 'warm' : 'cold'
+            return (
+              <div key={p.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,180,0,0.1)', border: '1px solid rgba(255,180,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--amber)' }}>
+                    {p.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  {idx < discovered.length - 1 && <div style={{ width: 1, height: 16, background: 'var(--border)', marginTop: 4 }} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)' }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
-                    Extracted from {p.discovery_source || 'RSS feed'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)' }}>{p.name}</span>
+                    <span className={`heat-tag ${heat}`}>{heat.toUpperCase()}</span>
+                    <span className="new-badge">NEW</span>
                   </div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{p.sector || 'Fintech'} · via {p.discovery_source || 'RSS'} · {ago}</div>
+                  {p.discovery_headline && (
+                    <div style={{ fontSize: 12, color: 'var(--text2)', fontStyle: 'italic', marginTop: 6, borderLeft: '2px solid var(--border)', paddingLeft: 10, lineHeight: 1.5 }}>
+                      "{p.discovery_headline.slice(0, 120)}{p.discovery_headline.length > 120 ? '…' : ''}"
+                    </div>
+                  )}
                 </div>
+                {p.intent_score != null && (
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: heat === 'hot' ? 'var(--teal)' : heat === 'warm' ? 'var(--amber)' : 'var(--text3)', flexShrink: 0 }}>{p.intent_score}</div>
+                )}
               </div>
-              {/* Source headline */}
-              {p.discovery_headline && (
-                <div style={{
-                  fontSize: 12, color: 'var(--text2)', fontStyle: 'italic',
-                  borderLeft: '2px solid var(--border)', paddingLeft: 10, lineHeight: 1.5,
-                }}>
-                  "{p.discovery_headline.slice(0, 140)}{p.discovery_headline.length > 140 ? '…' : ''}"
-                </div>
-              )}
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                <button
-                  onClick={() => onAdd(p)}
-                  disabled={addingId === p.id || skippingId === p.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                    cursor: 'pointer', border: '1px solid var(--teal)',
-                    background: addingId === p.id ? 'rgba(0,212,164,0.15)' : 'rgba(0,212,164,0.08)',
-                    color: 'var(--teal)', transition: 'all 0.2s',
-                  }}
-                >
-                  {addingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
-                  {addingId === p.id ? 'Adding…' : 'Add to Pipeline'}
-                </button>
-                <button
-                  onClick={() => onSkip(p)}
-                  disabled={addingId === p.id || skippingId === p.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                    cursor: 'pointer', border: '1px solid var(--border)',
-                    background: 'transparent', color: 'var(--text3)', transition: 'all 0.2s',
-                  }}
-                >
-                  {skippingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                  Skip
-                </button>
-              </div>
-            </div>
-          ))}
-          {unvalidated.length === 0 && (
+            )
+          })}
+          {discovered.length === 0 && (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)', fontSize: 14 }}>
-              All caught up — no new prospects to review.
+              No companies auto-discovered in the last 24h.<br />
+              <span style={{ fontSize: 12 }}>Click "Discover" to run a scan now.</span>
             </div>
           )}
         </div>
@@ -284,6 +234,9 @@ function ReviewModal({ prospects: unvalidated, onClose, onAdd, onSkip, addingId,
     </motion.div>
   )
 }
+
+
+
 
 export default function RadarPage() {
   const { prospects, loading, refetch } = useRealtimeProspects()
@@ -295,8 +248,6 @@ export default function RadarPage() {
   const [scanAllProgress, setScanAllProgress] = useState({ done: 0, total: 0 })
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [unvalidatedProspects, setUnvalidatedProspects] = useState([])
-  const [addingId, setAddingId] = useState(null)
-  const [skippingId, setSkippingId] = useState(null)
   const [dismissedEvents, setDismissedEvents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dismissedEvents') || '[]') }
     catch { return [] }
@@ -356,73 +307,60 @@ export default function RadarPage() {
     fetchEvents()
   }, [])
 
-  // ── Fetch + subscribe to unvalidated (discovered) prospects ──
+  // ── Fetch + subscribe to auto-discovered prospects (last 24h) ──
   useEffect(() => {
-    async function fetchUnvalidated() {
+    async function fetchDiscovered() {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const { data } = await supabase
         .from('prospects')
-        .select('id, name, discovery_source, discovery_headline')
-        .eq('needs_validation', true)
+        .select('id, name, discovery_source, discovery_headline, created_at, intent_score, sector')
+        .eq('is_new_entrant', true)
+        .gte('created_at', since)
         .order('created_at', { ascending: false })
       setUnvalidatedProspects(data || [])
     }
-    fetchUnvalidated()
+    fetchDiscovered()
 
-    // Realtime subscription — badge updates instantly when fetch-signals runs
+    // Realtime — new card appears in badge instantly when discover-prospects runs
     const channel = supabase
-      .channel('unvalidated-prospects')
+      .channel('auto-discovered-prospects')
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'prospects',
-        filter: 'needs_validation=eq.true',
-      }, () => fetchUnvalidated())
+        filter: 'is_new_entrant=eq.true',
+      }, () => fetchDiscovered())
       .subscribe()
 
     return () => supabase.removeChannel(channel)
   }, [])
 
-  // ── Add discovered prospect to pipeline ──────────────────────
-  const handleAddDiscovered = async (prospect) => {
-    setAddingId(prospect.id)
+  // ── Manually trigger full auto-discovery (Option B) ─────────────
+  const [isDiscovering, setIsDiscovering] = useState(false)
+  const handleRunDiscovery = async () => {
+    setIsDiscovering(true)
+    addToast('🔍 Auto-discovery started — scanning Inc42, ETBFSI…', 'info')
     try {
-      // Mark as validated + is_new_entrant
-      await supabase
-        .from('prospects')
-        .update({ needs_validation: false, is_new_entrant: true, sector: 'Fintech', stage: 'Unknown', hq_city: 'India' })
-        .eq('id', prospect.id)
-
-      // Trigger intent scoring for this new company
-      try {
-        await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/score-intent`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-            body: JSON.stringify({ company_id: prospect.id }),
-          }
-        )
-      } catch { /* score runs async, non-fatal */ }
-
-      setUnvalidatedProspects(prev => prev.filter(p => p.id !== prospect.id))
-      addToast(`${prospect.name} added to pipeline — scoring now…`, 'success')
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/discover-prospects`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({}),
+        }
+      )
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      if (data.discovered > 0) {
+        addToast(`✨ ${data.discovered} new prospect${data.discovered > 1 ? 's' : ''} discovered!`, 'success')
+        refetch()
+      } else {
+        addToast('No new companies found in latest headlines', 'info')
+      }
     } catch (err) {
-      addToast(err.message, 'error')
+      addToast(`Discovery failed: ${err.message}`, 'error')
     }
-    setAddingId(null)
-  }
-
-  // ── Skip (delete) discovered prospect ───────────────────────
-  const handleSkipDiscovered = async (prospect) => {
-    setSkippingId(prospect.id)
-    try {
-      await supabase.from('prospects').delete().eq('id', prospect.id)
-      setUnvalidatedProspects(prev => prev.filter(p => p.id !== prospect.id))
-      addToast(`${prospect.name} skipped`, 'info')
-    } catch (err) {
-      addToast(err.message, 'error')
-    }
-    setSkippingId(null)
+    setIsDiscovering(false)
   }
 
   const dismissEvent = (id) => {
@@ -557,7 +495,7 @@ export default function RadarPage() {
           <Pencil size={14} /> Edit ICP
         </button>
 
-        {/* 🔍 Discovery badge — shows when new prospects are found */}
+        {/* ✨ Discovery badge — auto-discovered in last 24h */}
         {unvalidatedProspects.length > 0 && (
           <button
             onClick={() => setShowReviewModal(true)}
@@ -570,11 +508,30 @@ export default function RadarPage() {
             }}
           >
             <Sparkles size={15} />
-            {unvalidatedProspects.length} New Prospect{unvalidatedProspects.length > 1 ? 's' : ''} Found
+            {unvalidatedProspects.length} Auto-Discovered
           </button>
         )}
 
+        {/* 🔍 Discover Now — triggers full auto-discovery pipeline */}
+        <button
+          onClick={handleRunDiscovery}
+          disabled={isDiscovering}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+            cursor: isDiscovering ? 'not-allowed' : 'pointer',
+            border: '1px solid rgba(123,110,255,0.35)',
+            background: 'rgba(123,110,255,0.08)', color: '#A99FFF',
+            opacity: isDiscovering ? 0.7 : 1, transition: 'all 0.2s',
+            height: 42, whiteSpace: 'nowrap',
+          }}
+        >
+          {isDiscovering ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          {isDiscovering ? 'Discovering…' : 'Discover'}
+        </button>
+
         {/* 🔥 SCAN ALL — Dedicated Real-Time Scan Button */}
+
         <button
           className="scan-all-btn"
           onClick={handleScanAll}
@@ -741,16 +698,12 @@ export default function RadarPage() {
         )}
       </AnimatePresence>
 
-      {/* Review Modal — Autonomous Discovery */}
+      {/* Discovery Panel — Auto-Discovery Timeline */}
       <AnimatePresence>
         {showReviewModal && (
-          <ReviewModal
-            prospects={unvalidatedProspects}
+          <DiscoveryPanel
+            discovered={unvalidatedProspects}
             onClose={() => setShowReviewModal(false)}
-            onAdd={handleAddDiscovered}
-            onSkip={handleSkipDiscovered}
-            addingId={addingId}
-            skippingId={skippingId}
           />
         )}
       </AnimatePresence>

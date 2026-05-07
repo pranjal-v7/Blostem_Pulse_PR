@@ -180,3 +180,33 @@ Return ONLY this JSON:
   ]
 }`;
 }
+
+// ─── 5. METADATA EXTRACTION PROMPT ───────────────────────────
+// Used by discover-prospects Stage 2: given SerpAPI search snippets
+// for a company name, extract structured B2B profile metadata.
+// Returns JSON with sector, stage, hq_city.
+
+export function metadataExtractionSystemPrompt(): string {
+  return `You are a B2B company profiler specialised in Indian fintech startups.
+Extract structured metadata from web search snippets about a company.
+Return ONLY valid JSON. No explanation. No markdown. Start with { and end with }.`;
+}
+
+export function metadataExtractionUserPrompt(company_name: string, snippets: string): string {
+  return `Extract company profile metadata for "${company_name}" from these search result snippets.
+
+Snippets:
+${snippets}
+
+Rules:
+- sector: pick ONE from [Lending, Payments, Insurtech, Neobank, NBFC, WealthTech, RegTech, B2B Fintech, Other]
+- stage: pick ONE from [Pre-Seed, Seed, Series A, Series B, Series C+, Unknown]
+- hq_city: the Indian city where headquartered (e.g. Bengaluru, Mumbai, Delhi, Pune, Hyderabad). Use "India" if unclear.
+
+Return ONLY this JSON:
+{
+  "sector": "<sector>",
+  "stage": "<stage>",
+  "hq_city": "<city>"
+}`;
+}
