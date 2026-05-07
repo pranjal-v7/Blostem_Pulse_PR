@@ -11,16 +11,16 @@ import {
 
 // Realistic contact data for demo seed companies
 const CONTACT_INFO = {
-  'KreditBee': { cto: 'Vivek R.', ctoEmail: 'vivek.r@kreditbee.in', cfo: 'Sunil K.', cfoEmail: 'sunil.k@kreditbee.in', email: 'partnerships@kreditbee.in', linkedin: 'https://linkedin.com/company/kreditbee' },
-  'Razorpay': { cto: 'Murali K.', ctoEmail: 'murali@razorpay.com', cfo: 'Anurag S.', cfoEmail: 'anurag.s@razorpay.com', email: 'enterprise@razorpay.com', linkedin: 'https://linkedin.com/company/razorpay' },
-  'Slice': { cto: 'Deepak A.', ctoEmail: 'deepak@sliceit.in', email: 'partnerships@sliceit.in', linkedin: 'https://linkedin.com/company/sliceit' },
-  'Jupiter Money': { cto: 'Prateek D.', ctoEmail: 'prateek@jupiter.money', email: 'biz@jupiter.money', linkedin: 'https://linkedin.com/company/jupiter-money' },
-  'Fibe': { cto: 'Rahul G.', ctoEmail: 'rahul.g@fibe.in', email: 'contact@fibe.in', linkedin: 'https://linkedin.com/company/fibe-india' },
-  'Niyo Solutions': { cto: 'Virender S.', ctoEmail: 'virender@goniyo.com', email: 'hello@goniyo.com', linkedin: 'https://linkedin.com/company/niyo-solutions' },
-  'Lendingkart': { cto: 'Amit J.', ctoEmail: 'amit.j@lendingkart.com', cfo: 'Divya M.', cfoEmail: 'divya.m@lendingkart.com', email: 'partners@lendingkart.com', linkedin: 'https://linkedin.com/company/lendingkart' },
-  'Uni Cards': { cto: 'Prashant K.', ctoEmail: 'prashant@uni.cards', email: 'hello@uni.cards', linkedin: 'https://linkedin.com/company/uni-cards' },
-  'NeoGrowth': { cto: 'Arun N.', ctoEmail: 'arun@neogrowth.in', email: 'info@neogrowth.in', linkedin: 'https://linkedin.com/company/neogrowth' },
-  'PaySense': { cto: 'Prashanth R.', ctoEmail: 'prashanth@gopaysense.com', email: 'connect@gopaysense.com', linkedin: 'https://linkedin.com/company/paysense' },
+  'KreditBee': { cto: 'Vivek R.', ctoEmail: 'vivek.r@kreditbee.in', cfo: 'Sunil K.', cfoEmail: 'sunil.k@kreditbee.in', email: 'partnerships@kreditbee.in', linkedin: 'https://linkedin.com/company/kreditbee', website: 'kreditbee.in' },
+  'Razorpay': { cto: 'Murali K.', ctoEmail: 'murali@razorpay.com', cfo: 'Anurag S.', cfoEmail: 'anurag.s@razorpay.com', email: 'enterprise@razorpay.com', linkedin: 'https://linkedin.com/company/razorpay', website: 'razorpay.com' },
+  'Slice': { cto: 'Deepak A.', ctoEmail: 'deepak@sliceit.in', email: 'partnerships@sliceit.in', linkedin: 'https://linkedin.com/company/sliceit', website: 'sliceit.com' },
+  'Jupiter Money': { cto: 'Prateek D.', ctoEmail: 'prateek@jupiter.money', email: 'biz@jupiter.money', linkedin: 'https://linkedin.com/company/jupiter-money', website: 'jupiter.money' },
+  'Fibe': { cto: 'Rahul G.', ctoEmail: 'rahul.g@fibe.in', email: 'contact@fibe.in', linkedin: 'https://linkedin.com/company/fibe-india', website: 'fibe.in' },
+  'Niyo Solutions': { cto: 'Virender S.', ctoEmail: 'virender@goniyo.com', email: 'hello@goniyo.com', linkedin: 'https://linkedin.com/company/niyo-solutions', website: 'goniyo.com' },
+  'Lendingkart': { cto: 'Amit J.', ctoEmail: 'amit.j@lendingkart.com', cfo: 'Divya M.', cfoEmail: 'divya.m@lendingkart.com', email: 'partners@lendingkart.com', linkedin: 'https://linkedin.com/company/lendingkart', website: 'lendingkart.com' },
+  'Uni Cards': { cto: 'Prashant K.', ctoEmail: 'prashant@uni.cards', email: 'hello@uni.cards', linkedin: 'https://linkedin.com/company/uni-cards', website: 'uni.cards' },
+  'NeoGrowth': { cto: 'Arun N.', ctoEmail: 'arun@neogrowth.in', email: 'info@neogrowth.in', linkedin: 'https://linkedin.com/company/neogrowth', website: 'neogrowth.in' },
+  'PaySense': { cto: 'Prashanth R.', ctoEmail: 'prashanth@gopaysense.com', email: 'connect@gopaysense.com', linkedin: 'https://linkedin.com/company/paysense', website: 'gopaysense.com' },
 }
 
 function ScoreRing({ score, size = 160, strokeWidth = 10 }) {
@@ -218,8 +218,7 @@ export default function CompanyDetailPage() {
 
       {/* Contact Info */}
       {(() => {
-        const ci = CONTACT_INFO[company.name] || dynamicContactInfo
-        if (!ci && !fetchingContactInfo) return null
+        const ci = CONTACT_INFO[company.name] || dynamicContactInfo || {}
         
         if (fetchingContactInfo) {
           return (
@@ -256,12 +255,14 @@ export default function CompanyDetailPage() {
                   </a>
                 </div>
               )}
-              <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(255,179,64,0.04)', border: '1px solid rgba(255,179,64,0.1)' }}>
-                <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Company Email</div>
-                <a href={`mailto:${ci.email}`} style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Mail size={12} /> {ci.email}
-                </a>
-              </div>
+              {ci.email && (
+                <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(255,179,64,0.04)', border: '1px solid rgba(255,179,64,0.1)' }}>
+                  <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Company Email</div>
+                  <a href={`mailto:${ci.email}`} style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Mail size={12} /> {ci.email}
+                  </a>
+                </div>
+              )}
               <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Links</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -279,6 +280,9 @@ export default function CompanyDetailPage() {
                     <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                       <Link2 size={12} /> {company.website}
                     </a>
+                  )}
+                  {!ci.linkedin && !ci.website && !company.website && (
+                    <span style={{ fontSize: 13, color: 'var(--text3)' }}>No public links found</span>
                   )}
                 </div>
               </div>
