@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAIStream } from "../_shared/ai.ts";
 import { corsHeaders } from "../_shared/utils.ts";
+import { emailSystemPrompt, emailUserPrompt } from "../_shared/prompts.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -22,7 +23,7 @@ Deno.serve(async (req) => {
 
     if (!company) throw new Error("Company not found");
 
-    // Fetch signals
+    // Fetch top 3 recent signals for personalisation
     const { data: signals } = await supabase
       .from("signals")
       .select("*")
@@ -36,30 +37,33 @@ Deno.serve(async (req) => {
     if (authHeader) {
       const { data: { user } } = await supabase.auth.getUser(authHeader);
       if (user) {
-        const { data: profile } = await supabase.from("profiles").select("icp_definition").eq("id", user.id).single();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("icp_definition")
+          .eq("id", user.id)
+          .single();
         if (profile?.icp_definition) icpDefinition = profile.icp_definition;
       }
     }
 
-    const signalText = (signals || []).map((s: any) => `- ${s.headline}`).join("\n") || "No signals";
+    const signalText = (signals || [])
+      .map((s: any) => `- ${s.headline} (${s.source})`)
+      .join("\n") || "No signals available — write based on sector context.";
 
-    const systemPrompt = "You write precise B2B sales emails for fintech compliance products. No fluff. No preamble.";
-
-    const userPrompt = `Write a ${tone} sales email to the ${stakeholder} of ${company.name}.
-
-Company context:
-- Sector: ${company.sector}, Stage: ${company.stage}, HQ: ${company.hq_city}
-- Why they're a fit: ${company.alignment_reason || "Strong ICP alignment"}
-
-Top signals to reference:
-${signalText}
-
-Our product (ICP): ${icpDefinition}
-
-Output format: Subject line on first line, blank line, then email body.
-No preamble. No "Here is your email:". Just subject + body.`;
-
-    const stream = await callAIStream(systemPrompt, userPrompt);
+    const stream = await callAIStream(
+      emailSystemPrompt(),
+      emailUserPrompt({
+        company_name: company.name,
+        sector: company.sector,
+        stage: company.stage,
+        hq_city: company.hq_city,
+        alignment_reason: company.alignment_reason || "",
+        signals: signalText,
+        icp_definition: icpDefinition,
+        stakeholder,
+        tone,
+      })
+    );
 
     return new Response(stream, {
       headers: {
