@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlostемPulse — Redesign Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg0:#04060F;--bg1:#080B18;--bg2:#0D1120;--bg3:#111625;
+  --card:rgba(255,255,255,0.035);--card-hover:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.14);
+  --teal:#00D4A4;--teal-dim:#0A7A60;--teal-glow:rgba(0,212,164,0.15);
+  --purple:#7B6EFF;--purple-dim:#3D3580;--purple-glow:rgba(123,110,255,0.12);
+  --coral:#FF5040;--coral-glow:rgba(255,80,64,0.15);
+  --amber:#FFB340;--amber-glow:rgba(255,179,64,0.15);
+  --text1:#F0F3FF;--text2:#8B90B0;--text3:#4A4F6A;
+  --font-display:'Syne',sans-serif;--font-mono:'JetBrains Mono',monospace;
+  --sidebar:60px;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg0);color:var(--text1);font-family:var(--font-display);}
+/* ─── CURSOR ─────────────────────────── */
+*{cursor:none!important;}
+#cursor-dot{position:fixed;width:6px;height:6px;background:var(--teal);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:background 0.2s;}
+#cursor-ring{position:fixed;width:28px;height:28px;border:1.5px solid rgba(0,212,164,0.5);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width 0.25s,height 0.25s,border-color 0.2s,background 0.2s;}
+body.hovering #cursor-ring{width:40px;height:40px;border-color:var(--teal);background:rgba(0,212,164,0.06);}
+body.clicking #cursor-dot{width:10px;height:10px;}
+/* ─── BACKGROUND ─────────────────────── */
+#bg-canvas{position:fixed;inset:0;z-index:0;overflow:hidden;}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:0.18;}
+.orb1{width:600px;height:600px;background:radial-gradient(circle,#0F6E56,transparent 70%);top:-200px;left:-100px;animation:orbFloat1 18s ease-in-out infinite;}
+.orb2{width:500px;height:500px;background:radial-gradient(circle,#3D3580,transparent 70%);bottom:-150px;right:-100px;animation:orbFloat2 22s ease-in-out infinite;}
+.orb3{width:300px;height:300px;background:radial-gradient(circle,#993C1D,transparent 70%);top:40%;left:45%;animation:orbFloat3 15s ease-in-out infinite;opacity:0.1;}
+@keyframes orbFloat1{0%,100%{transform:translate(0,0);}50%{transform:translate(40px,60px);}}
+@keyframes orbFloat2{0%,100%{transform:translate(0,0);}50%{transform:translate(-50px,-40px);}}
+@keyframes orbFloat3{0%,100%{transform:translate(0,0);}50%{transform:translate(30px,-50px);}}
+.grid-lines{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:48px 48px;}
+/* ─── LAYOUT ─────────────────────────── */
+#app{position:relative;z-index:1;display:flex;width:100%;height:100vh;}
+/* ─── SIDEBAR ────────────────────────── */
+#sidebar{width:var(--sidebar);height:100%;background:rgba(4,6,15,0.85);border-right:1px solid var(--border);backdrop-filter:blur(20px);display:flex;flex-direction:column;align-items:center;padding:20px 0;flex-shrink:0;z-index:10;}
+.sb-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--teal-dim),var(--teal));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:32px;flex-shrink:0;}
+.sb-nav{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.sb-item{position:relative;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer!important;transition:background 0.2s,border-color 0.2s;border:1px solid transparent;}
+.sb-item svg{width:18px;height:18px;stroke:var(--text3);transition:stroke 0.2s;}
+.sb-item.active{background:var(--teal-glow);border-color:rgba(0,212,164,0.25);}
+.sb-item.active svg{stroke:var(--teal);}
+.sb-item:hover{background:var(--card-hover);}
+.sb-item:hover svg{stroke:var(--text2);}
+.sb-badge{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--coral);border:1.5px solid var(--bg0);animation:badgePulse 2s ease-in-out infinite;}
+@keyframes badgePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.7;transform:scale(0.85);}}
+.sb-user{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#3D3580,#7B6EFF);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;margin-top:auto;}
+/* ─── MAIN ───────────────────────────── */
+#main{flex:1;height:100%;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;}
+#main::-webkit-scrollbar{width:4px;}
+#main::-webkit-scrollbar-track{background:transparent;}
+#main::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+/* ─── KPI STRIP ──────────────────────── */
+#kpi-strip{display:flex;gap:1px;background:var(--border);border-bottom:1px solid var(--border);flex-shrink:0;}
+.kpi-card{flex:1;padding:14px 20px;background:var(--bg1);display:flex;flex-direction:column;gap:3px;}
+.kpi-label{font-size:10px;color:var(--text3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.08em;}
+.kpi-val{font-size:20px;font-weight:700;letter-spacing:-0.02em;}
+.kpi-val.teal{color:var(--teal);}
+.kpi-val.amber{color:var(--amber);}
+.kpi-val.coral{color:var(--coral);}
+.kpi-val.text{color:var(--text2);}
+/* ─── TOOLBAR ────────────────────────── */
+#toolbar{padding:20px 24px 0;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+#toolbar h1{font-size:18px;font-weight:700;color:var(--text1);flex:1;}
+/* ─── SEARCH ─────────────────────────── */
+#search-wrap{position:relative;flex:1;max-width:360px;}
+#search-input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 14px 9px 38px;font-size:13px;color:var(--text1);font-family:var(--font-mono);outline:none;transition:border-color 0.2s,box-shadow 0.2s;}
+#search-input::placeholder{color:var(--text3);}
+#search-input:focus{border-color:rgba(0,212,164,0.4);box-shadow:0 0 0 3px rgba(0,212,164,0.08);}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--text3);}
+#search-input:focus~.search-scan{display:block;}
+.search-scan{display:none;position:absolute;bottom:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,var(--teal),transparent);animation:scanSlide 1.5s linear infinite;}
+@keyframes scanSlide{0%{left:-100%;right:100%;}100%{left:100%;right:-100%;}}
+/* ─── MACRO BANNER ───────────────────── */
+#macro-banner{padding:12px 24px;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;}
+#macro-banner::-webkit-scrollbar{display:none;}
+.macro-pill{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:11px;font-family:var(--font-mono);white-space:nowrap;flex-shrink:0;border:1px solid;cursor:pointer!important;transition:opacity 0.2s;}
+.macro-pill.coral{background:var(--coral-glow);border-color:rgba(255,80,64,0.3);color:#FF8070;}
+.macro-pill.amber{background:var(--amber-glow);border-color:rgba(255,179,64,0.3);color:#FFB340;}
+.macro-pill.purple{background:var(--purple-glow);border-color:rgba(123,110,255,0.3);color:#A99FFF;}
+.macro-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:badgePulse 2s ease-in-out infinite;}
+.macro-close{opacity:0.5;margin-left:4px;font-size:12px;}
+/* ─── PROSPECT LIST ──────────────────── */
+#list-wrap{padding:0 24px 24px;display:flex;flex-direction:column;gap:10px;flex:1;}
+/* ─── PROSPECT CARD ──────────────────── */
+.prospect-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:16px;transition:background 0.2s,border-color 0.2s,transform 0.2s;cursor:pointer!important;position:relative;overflow:hidden;}
+.prospect-card::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,var(--teal-glow),transparent);opacity:0;transition:opacity 0.3s;pointer-events:none;}
+.prospect-card:hover{background:var(--card-hover);border-color:var(--border-hover);transform:translateX(3px);}
+.prospect-card:hover::before{opacity:1;}
+/* company logo */
+.co-logo{width:42px;height:42px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text2);}
+.co-logo img{width:100%;height:100%;object-fit:contain;padding:6px;}
+/* info */
+.co-info{flex:1;min-width:0;}
+.co-name-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.co-name{font-size:14px;font-weight:600;color:var(--text1);}
+.new-badge{font-size:9px;font-family:var(--font-mono);padding:2px 7px;border-radius:20px;background:rgba(123,110,255,0.2);border:1px solid rgba(123,110,255,0.4);color:var(--purple);text-transform:uppercase;letter-spacing:0.06em;animation:newPulse 2.5s ease-in-out infinite;}
+@keyframes newPulse{0%,100%{border-color:rgba(123,110,255,0.4);}50%{border-color:rgba(123,110,255,0.8);}}
+.co-meta{font-size:11px;color:var(--text3);font-family:var(--font-mono);display:flex;gap:10px;}
+.co-meta span{display:flex;align-items:center;gap:4px;}
+/* signals */
+.signal-dots{display:flex;gap:4px;align-items:center;}
+.sig-dot{width:7px;height:7px;border-radius:50%;}
+.sig-dot.hot{background:var(--teal);box-shadow:0 0 6px var(--teal);}
+.sig-dot.warm{background:var(--amber);}
+.sig-dot.cold{background:var(--text3);}
+/* score ring */
+.score-ring-wrap{position:relative;width:52px;height:52px;flex-shrink:0;}
+.score-ring-wrap svg{width:52px;height:52px;transform:rotate(-90deg);}
+.score-bg{fill:none;stroke:rgba(255,255,255,0.06);stroke-width:3;}
+.score-arc{fill:none;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1);}
+.score-arc.hot{stroke:var(--teal);}
+.score-arc.warm{stroke:var(--amber);}
+.score-arc.cold{stroke:var(--text3);}
+.score-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;font-family:var(--font-mono);}
+.score-num.hot{color:var(--teal);}
+.score-num.warm{color:var(--amber);}
+.score-num.cold{color:var(--text2);}
+/* heat tag */
+.heat-tag{font-size:10px;font-family:var(--font-mono);padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:0.08em;border:1px solid;flex-shrink:0;}
+.heat-tag.hot{background:rgba(0,212,164,0.12);border-color:rgba(0,212,164,0.35);color:var(--teal);}
+.heat-tag.warm{background:rgba(255,179,64,0.12);border-color:rgba(255,179,64,0.35);color:var(--amber);}
+.heat-tag.cold{background:rgba(74,79,106,0.2);border-color:rgba(74,79,106,0.4);color:var(--text3);}
+/* scan button */
+.scan-btn{font-size:11px;font-family:var(--font-mono);padding:6px 14px;border-radius:8px;background:transparent;border:1px solid var(--border);color:var(--text2);cursor:pointer!important;transition:all 0.2s;white-space:nowrap;flex-shrink:0;}
+.scan-btn:hover{background:var(--teal-glow);border-color:rgba(0,212,164,0.4);color:var(--teal);}
+.scan-btn.scanning{border-color:rgba(0,212,164,0.4);color:var(--teal);}
+/* ─── RADAR GRAPHIC (decorative) ─────── */
+#radar-graphic{position:fixed;right:-80px;top:50%;transform:translateY(-50%);width:320px;height:320px;opacity:0.06;z-index:0;pointer-events:none;}
+.radar-circle{fill:none;stroke:#00D4A4;stroke-width:0.8;}
+.radar-sweep{fill:url(#sweep-grad);transform-origin:160px 160px;animation:radarSpin 4s linear infinite;}
+@keyframes radarSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+/* ─── LOADING SPINNER ────────────────── */
+.spin{width:14px;height:14px;border:2px solid rgba(0,212,164,0.2);border-top-color:var(--teal);border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+/* ─── DECAY EFFECT ───────────────────── */
+.prospect-card[data-age="high"]{opacity:0.55;}
+.prospect-card[data-age="med"]{opacity:0.78;}
+/* ─── TOOLTIP ────────────────────────── */
+.tooltip{position:absolute;background:rgba(8,11,24,0.95);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;font-family:var(--font-mono);color:var(--text2);pointer-events:none;z-index:100;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,0.4);}
+/* ─── DELTA FLASH ────────────────────── */
+.delta-flash{font-size:11px;font-family:var(--font-mono);font-weight:600;animation:deltaFade 2.5s ease-out forwards;}
+@keyframes deltaFade{0%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-16px);}}
+.delta-flash.pos{color:var(--teal);}
+.delta-flash.neg{color:var(--coral);}
+/* ─── SECTION LABEL ──────────────────── */
+.section-label{font-size:10px;font-family:var(--font-mono);color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;padding:16px 24px 6px;flex-shrink:0;}
+/* ─── ICP EDIT BTN ───────────────────── */
+.icp-btn{font-size:12px;font-family:var(--font-mono);padding:8px 16px;border-radius:9px;background:var(--purple-glow);border:1px solid rgba(123,110,255,0.3);color:#A99FFF;cursor:pointer!important;transition:all 0.2s;display:flex;align-items:center;gap:6px;}
+.icp-btn:hover{background:rgba(123,110,255,0.15);border-color:rgba(123,110,255,0.5);}
+/* ─── SIGNAL TIMELINE ─────────────────── */
+.signal-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
+.sig-line{display:flex;gap:5px;align-items:center;}
+.sig-pulse{width:8px;height:8px;border-radius:50%;position:relative;}
+.sig-pulse::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1.5px solid currentColor;animation:sigRipple 2s ease-out infinite;opacity:0;}
+@keyframes sigRipple{0%{transform:scale(1);opacity:0.6;}100%{transform:scale(2.5);opacity:0;}}
+/* ─── CARD ENTER ANIMATION ───────────── */
+.prospect-card{animation:cardEnter 0.4s ease-out both;}
+@keyframes cardEnter{from{opacity:0;transform:translateX(-12px);}to{opacity:1;transform:translateX(0);}}
+.prospect-card:nth-child(1){animation-delay:0.05s;}
+.prospect-card:nth-child(2){animation-delay:0.1s;}
+.prospect-card:nth-child(3){animation-delay:0.15s;}
+.prospect-card:nth-child(4){animation-delay:0.2s;}
+.prospect-card:nth-child(5){animation-delay:0.25s;}
+.prospect-card:nth-child(6){animation-delay:0.3s;}
+/* ─── SCROLLBAR ──────────────────────── */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+/* ─── GRAIN OVERLAY ──────────────────── */
+#grain{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");}
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div id="cursor-dot"></div>
+<div id="cursor-ring"></div>
+
+<!-- Background -->
+<div id="bg-canvas">
+  <div class="grid-lines"></div>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+
+<!-- Radar graphic decoration -->
+<svg id="radar-graphic" viewBox="0 0 320 320">
+  <defs>
+    <radialGradient id="sweep-grad" cx="50%" cy="100%" r="50%">
+      <stop offset="0%" stop-color="#00D4A4" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#00D4A4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle class="radar-circle" cx="160" cy="160" r="60"/>
+  <circle class="radar-circle" cx="160" cy="160" r="100"/>
+  <circle class="radar-circle" cx="160" cy="160" r="140"/>
+  <line x1="160" y1="20" x2="160" y2="300" stroke="#00D4A4" stroke-width="0.5" opacity="0.3"/>
+  <line x1="20" y1="160" x2="300" y2="160" stroke="#00D4A4" stroke-width="0.5" opacity="0.3"/>
+  <path class="radar-sweep" d="M160,160 L160,20 A140,140 0 0,1 230,222 Z"/>
+  <!-- blips -->
+  <circle cx="200" cy="100" r="3" fill="#00D4A4" opacity="0.9"/>
+  <circle cx="120" cy="200" r="2.5" fill="#00D4A4" opacity="0.6"/>
+  <circle cx="230" cy="170" r="2" fill="#FFB340" opacity="0.7"/>
+  <circle cx="100" cy="130" r="3.5" fill="#00D4A4" opacity="0.8"/>
+  <circle cx="170" cy="240" r="2" fill="#7B6EFF" opacity="0.6"/>
+</svg>
+
+<!-- Grain texture -->
+<div id="grain"></div>
+
+<!-- App -->
+<div id="app">
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sb-logo">BP</div>
+    <div class="sb-nav">
+      <!-- Radar -->
+      <div class="sb-item active" title="Prospect Radar">
+        <div class="sb-badge"></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 16.24a6 6 0 0 1 0-8.49"/><path d="M20.07 3.93a10 10 0 0 1 0 16.14"/><path d="M3.93 20.07a10 10 0 0 1 0-16.14"/>
+        </svg>
+      </div>
+      <!-- Outreach -->
+      <div class="sb-item" title="Outreach">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+        </svg>
+      </div>
+      <!-- Analytics -->
+      <div class="sb-item" title="Analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+      </div>
+      <!-- Settings -->
+      <div class="sb-item" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+    </div>
+    <div class="sb-user">AK</div>
+  </nav>
+
+  <!-- Main content -->
+  <main id="main">
+    <!-- KPI strip -->
+    <div id="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-label">Companies Scored</div>
+        <div class="kpi-val teal" id="kpi-scored">52</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Hot Leads</div>
+        <div class="kpi-val amber" id="kpi-hot">8</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Last Scan</div>
+        <div class="kpi-val text">2h ago</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">RBI Alerts</div>
+        <div class="kpi-val coral">3</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div id="toolbar">
+      <h1>Prospect Radar</h1>
+      <!-- Search -->
+      <div id="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" type="text" placeholder="Search fintech prospects..." oninput="filterCards(this.value)">
+        <div class="search-scan"></div>
+      </div>
+      <!-- ICP btn -->
+      <button class="icp-btn" onclick="showToast('ICP modal coming soon')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A99FFF" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Edit ICP
+      </button>
+    </div>
+
+    <!-- Macro alerts -->
+    <div id="macro-banner">
+      <div class="macro-pill coral">
+        <div class="macro-dot"></div>
+        RBI repo rate +25bps — lending fintechs affected
+        <span class="macro-close" onclick="this.parentElement.remove()">✕</span>
+      </div>
+      <div class="macro-pill amber">
+        <div class="macro-dot"></div>
+        Budget 2026: digital lending push — 12 companies signalled
+        <span class="macro-close" onclick="this.parentElement.remove()">✕</span>
+      </div>
+      <div class="macro-pill purple">
+        <div class="macro-dot"></div>
+        SEBI tightens KYC norms for neobanks
+        <span class="macro-close" onclick="this.parentElement.remove()">✕</span>
+      </div>
+    </div>
+
+    <div class="section-label">Hot Leads · Score &gt; 75</div>
+
+    <!-- Prospect list -->
+    <div id="list-wrap">
+
+      <!-- Card 1 -->
+      <div class="prospect-card" data-name="kreditbee" data-age="low" onclick="openDetail('KreditBee')">
+        <div class="co-logo"><img src="https://logo.clearbit.com/kreditbee.in" onerror="this.parentElement.innerText='KB'"></div>
+        <div class="co-info">
+          <div class="co-name-row">
+            <span class="co-name">KreditBee</span>
+            <span class="heat-tag hot">HOT</span>
+          </div>
+          <div class="co-meta">
+            <span>Lending · Series D</span>
+            <span>Bengaluru</span>
+          </div>
+          <div class="signal-row">
+            <div class="sig-line">
+              <div class="sig-pulse" style="background:var(--teal);color:var(--teal)"></div>
+              <div class="sig-pulse" style="background:var(--teal);color:var(--teal)"></div>
+              <div class="sig-pulse" style="background:var(--teal);color:var(--teal)"></div>
+              <div class="sig-pulse" style="background:var(--amber);color:var(--amber)"></div>
+            </div>
+            <span style="font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-left:6px;">4 signals · 1 day ago</span>
+          </div>
+        </div>
+        <div class="score-ring-wrap" id="ring-kb">
+          <svg viewBox="0 0 52 52"><circle class="score-bg" cx="26" cy="26" r="21"/><circle class="score-arc hot" cx="26" cy="26" r="21" stroke-dasharray="131.9" stroke-dashoffset="23.7" id="arc-kb"/></svg>
+          <div class="score-num hot">91</div>
+        </div>
+        <button class="scan-btn" id="scan-kb" onclick="runScan(event,'kb','91')">Run Scan</button>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="prospect-card" data-name="razorpay" data-age="low" onclick="openDetail('Razorpay')">
+        <div class="co-logo"><img src="https://logo.clearbit.com/razorpay.com" onerror="this.parentElement.innerText='RP'"></div>
+        <div class="co-info">
+          <div class="co-name-row">
+            <span class="co-name">Razorpay</span>
+            <span class="heat-tag hot">HOT</span>
+          </div>
+          <div class="co-meta">
+            <span>Payments · Series F</span>
+            <span>Bengaluru</span>
+          </div>
+          <div class="signal-row">
+            <div class="sig-line">
+              <div class="sig-pulse" style="background:var(--teal);color:var(--teal)"></div>
+              <div class="sig-pulse" style="background:var(--teal);color:var(--teal)"></div>
+              <div class="sig-pulse" style="background:var(--text3);color:var(--text3)"></div>
+            </div>
+            <span style="font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-left:6px;">3 signals · 6h ago</span>
+          </div>
+        </div>
+        <div class="score-ring-wrap">
+          <svg viewBox="0 0 52 52"><circle class="score-bg" cx="26" cy="26" r="21"/><circle class="score-arc hot" cx="26" cy="26" r="21" stroke-dasharray="131.9" stroke-dashoffset="23.7"/></svg>
+          <div class="score-num hot">82</div>
+        </div>
+        <button class="scan-btn" onclick="runScan(event,'rp','82')">Run Scan</button>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="prospect-card" data-name="fibe" data-age="low" onclick="openDetail('Fibe')">
+        <div class="co-logo"><img src="https://logo.clearbit.com/fibe.in" onerror="this.parentElement.innerText='FI'"></div>
+        <div class="co-info">
+          <div class="co-name-row">
+            <span class="co-name">Fibe</span>
+            <span class="heat-tag hot">HOT</span>
+          </div>
+          <div class="co-meta">
+            <span>Consumer Lending · Series C</span>
+            <span>Mumbai</span>
+          </div>
+          <div class="signal-row">
+            <div class="sig-line">
+              <div class="sig-pulse" style="background:var(--teal);color:var(--teal)"></div>
+              <div class="sig-pulse" style="background:var(--teal);color:var(--teal)"></div>
+              <div class="sig-pulse" style="background:var(--amber);color:var(--amber)"></div>
+            </div>
+            <span style="font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-left:6px;">3 signals · 2 days ago</span>
+          </div>
+        </div>
+        <div class="score-ring-wrap">
+          <svg viewBox="0 0 52 52"><circle class="score-bg" cx="26" cy="26" r="21"/><circle class="score-arc hot" cx="26" cy="26" r="21" stroke-dasharray="131.9" stroke-dashoffset="31.7"/></svg>
+          <div class="score-num hot">77</div>
+        </div>
+        <button class="scan-btn" onclick="runScan(event,'fi','77')">Run Scan</button>
+      </div>
+
+      <div class="section-label" style="padding-left:0;">Warm Leads · Score 50–75</div>
+
+      <!-- Card 4 -->
+      <div class="prospect-card" data-name="jupiter" data-age="low" onclick="openDetail('Jupiter Money')">
+        <div class="co-logo"><img src="https://logo.clearbit.com/jupiter.money" onerror="this.parentElement.innerText='JM'"></div>
+        <div class="co-info">
+          <div class="co-name-row">
+            <span class="co-name">Jupiter Money</span>
+            <span class="new-badge">NEW</span>
+            <span class="heat-tag warm">WARM</span>
+          </div>
+          <div class="co-meta">
+            <span>Neobank · Series C</span>
+            <span>Bengaluru</span>
+          </div>
+          <div class="signal-row">
+            <div class="sig-line">
+              <div class="sig-pulse" style="background:var(--amber);color:var(--amber)"></div>
+              <div class="sig-pulse" style="background:var(--amber);color:var(--amber)"></div>
+            </div>
+            <span style="font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-left:6px;">2 signals · 3 days ago</span>
+          </div>
+        </div>
+        <div class="score-ring-wrap">
+          <svg viewBox="0 0 52 52"><circle class="score-bg" cx="26" cy="26" r="21"/><circle class="score-arc warm" cx="26" cy="26" r="21" stroke-dasharray="131.9" stroke-dashoffset="42"/></svg>
+          <div class="score-num warm">68</div>
+        </div>
+        <button class="scan-btn" onclick="runScan(event,'jm','68')">Run Scan</button>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="prospect-card" data-name="slice" data-age="med" onclick="openDetail('Slice')">
+        <div class="co-logo"><img src="https://logo.clearbit.com/sliceit.in" onerror="this.parentElement.innerText='SL'"></div>
+        <div class="co-info">
+          <div class="co-name-row">
+            <span class="co-name">Slice</span>
+            <span class="heat-tag warm">WARM</span>
+          </div>
+          <div class="co-meta">
+            <span>Neobank · Series B</span>
+            <span>Bengaluru</span>
+          </div>
+          <div class="signal-row">
+            <div class="sig-line">
+              <div class="sig-pulse" style="background:var(--amber);color:var(--amber)"></div>
+              <div class="sig-pulse" style="background:var(--text3);color:var(--text3)"></div>
+            </div>
+            <span style="font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-left:6px;">2 signals · 5 days ago</span>
+          </div>
+        </div>
+        <div class="score-ring-wrap">
+          <svg viewBox="0 0 52 52"><circle class="score-bg" cx="26" cy="26" r="21"/><circle class="score-arc warm" cx="26" cy="26" r="21" stroke-dasharray="131.9" stroke-dashoffset="49"/></svg>
+          <div class="score-num warm">62</div>
+        </div>
+        <button class="scan-btn" onclick="runScan(event,'sl','62')">Run Scan</button>
+      </div>
+
+      <!-- Card 6 (cold / faded) -->
+      <div class="prospect-card" data-name="neogrowth" data-age="high" onclick="openDetail('NeoGrowth')">
+        <div class="co-logo"><img src="https://logo.clearbit.com/neogrowth.in" onerror="this.parentElement.innerText='NG'"></div>
+        <div class="co-info">
+          <div class="co-name-row">
+            <span class="co-name">NeoGrowth</span>
+            <span class="heat-tag cold">COLD</span>
+          </div>
+          <div class="co-meta">
+            <span>NBFC · Series E</span>
+            <span>Mumbai</span>
+          </div>
+          <div class="signal-row">
+            <div class="sig-line">
+              <div class="sig-pulse" style="background:var(--text3);color:var(--text3)"></div>
+            </div>
+            <span style="font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-left:6px;">1 signal · 18 days ago</span>
+          </div>
+        </div>
+        <div class="score-ring-wrap">
+          <svg viewBox="0 0 52 52"><circle class="score-bg" cx="26" cy="26" r="21"/><circle class="score-arc cold" cx="26" cy="26" r="21" stroke-dasharray="131.9" stroke-dashoffset="95"/></svg>
+          <div class="score-num cold">28</div>
+        </div>
+        <button class="scan-btn" onclick="runScan(event,'ng','28')">Run Scan</button>
+      </div>
+
+    </div><!-- end list-wrap -->
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(8,11,24,0.95);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-size:12px;font-family:var(--font-mono);color:var(--text2);pointer-events:none;opacity:0;transition:all 0.3s;z-index:1000;white-space:nowrap;backdrop-filter:blur(20px);"></div>
+
+<script>
+// ─── CURSOR ──────────────────────────────────────
+const dot=document.getElementById('cursor-dot');
+const ring=document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX;my=e.clientY;
+  dot.style.left=mx+'px';dot.style.top=my+'px';
+});
+function lerpCursor(){
+  rx+=(mx-rx)*0.12;ry+=(my-ry)*0.12;
+  ring.style.left=rx+'px';ring.style.top=ry+'px';
+  requestAnimationFrame(lerpCursor);
+}
+lerpCursor();
+document.querySelectorAll('button,a,.prospect-card,.sb-item,.macro-close,.macro-pill').forEach(el=>{
+  el.addEventListener('mouseenter',()=>document.body.classList.add('hovering'));
+  el.addEventListener('mouseleave',()=>document.body.classList.remove('hovering'));
+});
+document.addEventListener('mousedown',()=>document.body.classList.add('clicking'));
+document.addEventListener('mouseup',()=>document.body.classList.remove('clicking'));
+
+// ─── SEARCH FILTER ───────────────────────────────
+function filterCards(q){
+  const cards=document.querySelectorAll('.prospect-card');
+  cards.forEach(c=>{
+    const name=c.dataset.name||'';
+    c.style.display=name.includes(q.toLowerCase())?'flex':'none';
+  });
+}
+
+// ─── DEEP SCAN ───────────────────────────────────
+function runScan(e,id,oldScore){
+  e.stopPropagation();
+  const btn=e.currentTarget;
+  const card=btn.closest('.prospect-card');
+  btn.innerHTML='<div class="spin"></div>';
+  btn.classList.add('scanning');
+  
+  setTimeout(()=>{
+    const delta=Math.floor(Math.random()*18)-4;
+    const newScore=Math.max(0,Math.min(100,parseInt(oldScore)+delta));
+    btn.innerHTML='Run Scan';
+    btn.classList.remove('scanning');
+    btn.setAttribute('onclick',`runScan(event,'${id}','${newScore}')`);
+    
+    // Update score display
+    const numEl=card.querySelector('.score-num');
+    if(numEl) animateCount(numEl,parseInt(oldScore),newScore,800);
+    
+    // Update arc
+    const arc=card.querySelector('.score-arc');
+    if(arc){
+      const c=131.9;
+      const offset=c-(c*newScore/100);
+      arc.style.strokeDashoffset=offset;
+    }
+    
+    // Delta flash
+    const flash=document.createElement('div');
+    flash.className='delta-flash '+(delta>=0?'pos':'neg');
+    flash.style.cssText='position:absolute;right:100px;top:12px;z-index:10;';
+    flash.textContent=(delta>=0?'+':'')+delta+' pts';
+    card.appendChild(flash);
+    setTimeout(()=>flash.remove(),2500);
+    
+    showToast((delta>=0?'Score updated: +':'Score updated: ')+delta+' pts for '+card.querySelector('.co-name').textContent);
+  },1800+Math.random()*600);
+}
+
+function animateCount(el,from,to,dur){
+  const start=performance.now();
+  function step(ts){
+    const progress=Math.min((ts-start)/dur,1);
+    const ease=1-Math.pow(1-progress,3);
+    el.textContent=Math.round(from+(to-from)*ease);
+    if(progress<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ─── TOAST ───────────────────────────────────────
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2800);
+}
+
+// ─── OPEN DETAIL ─────────────────────────────────
+function openDetail(name){showToast('Opening '+name+' detail page...');}
+
+// ─── SCORE RINGS: animate on load ────────────────
+document.querySelectorAll('.score-arc').forEach(arc=>{
+  const final=arc.style.strokeDashoffset;
+  arc.style.strokeDashoffset='131.9';
+  setTimeout(()=>{arc.style.transition='stroke-dashoffset 1.4s cubic-bezier(0.4,0,0.2,1)';arc.style.strokeDashoffset=final;},200);
+});
+
+// ─── SIDEBAR TABS ─────────────────────────────────
+document.querySelectorAll('.sb-item').forEach(item=>{
+  item.addEventListener('click',function(){
+    document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+    this.classList.add('active');
+    showToast('Navigating to '+this.title);
+  });
+});
+
+// ─── KPI COUNT-UP ─────────────────────────────────
+[{id:'kpi-scored',from:0,to:52},{id:'kpi-hot',from:0,to:8}].forEach(({id,from,to})=>{
+  const el=document.getElementById(id);
+  if(el) animateCount(el,from,to,1000);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,416 @@
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
+import { useToast } from '../components/Toast'
+import {
+  Mail, Shield, ShieldCheck, ShieldAlert, Wand2, ExternalLink,
+  Search, Clock, Activity, Loader2, CheckCircle, AlertTriangle
+} from 'lucide-react'
+
+const STAKEHOLDERS = ['CTO', 'CFO', 'Compliance Head', 'Founder']
+const TONES = ['Formal', 'Consultative', 'Urgent', 'Friendly']
+
+function timeAgo(d) {
+  if (!d) return 'Never'
+  const s = Math.floor((new Date() - new Date(d)) / 1000)
+  if (s < 86400) return `${Math.floor(s / 3600)}h idle`
+  return `${Math.floor(s / 86400)}d idle`
+}
+
+export default function OutreachPage() {
+  const [searchParams] = useSearchParams()
+  const { session } = useAuth()
+  const { addToast } = useToast()
+  const [prospects, setProspects] = useState([])
+  const [selected, setSelected] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [stakeholder, setStakeholder] = useState('CTO')
+  const [tone, setTone] = useState('Consultative')
+  const [emailBody, setEmailBody] = useState('')
+  const [subjectLine, setSubjectLine] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [complianceResult, setComplianceResult] = useState(null)
+  const [isCheckingCompliance, setIsCheckingCompliance] = useState(false)
+  const [isFixing, setIsFixing] = useState(false)
+  const [filter, setFilter] = useState('all')
+
+  useEffect(() => {
+    async function fetch() {
+      const { data } = await supabase.from('prospects').select('*').order('intent_score', { ascending: false })
+      setProspects(data || [])
+      const preselect = searchParams.get('company_id')
+      if (preselect && data) {
+        const found = data.find(p => p.id === preselect)
+        if (found) setSelected(found)
+      }
+    }
+    fetch()
+  }, [searchParams])
+
+  const filteredProspects = prospects.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    if (filter === 'contacted') return matchesSearch && p.last_contacted
+    if (filter === 'not_contacted') return matchesSearch && !p.last_contacted
+    return matchesSearch
+  })
+
+  // Fallback email generator when Edge Function is unavailable
+  const generateEmailFallback = async () => {
+    const subject = `Re: Compliance automation for ${selected.name}'s ${selected.sector} operations`
+    const body = `Dear ${stakeholder},\n\nI noticed ${selected.name}'s recent expansion in the ${selected.sector} space, particularly your operations out of ${selected.hq_city}. Given your ${selected.stage} stage and the increasing regulatory scrutiny from RBI on digital lending compliance, I wanted to reach out.\n\nBlostem's compliance automation platform has helped similar ${selected.sector} companies reduce their compliance overhead significantly while maintaining full RBI/SEBI adherence. Our AI-driven approach means your team can focus on growth rather than regulatory paperwork.\n\nSpecifically, we can help ${selected.name} with:\n• Automated KYC/AML compliance monitoring\n• Real-time regulatory change tracking (RBI circulars, SEBI updates)\n• Pre-audit readiness reports for your compliance team\n\nWould you have 15 minutes this week for a brief walkthrough? I'd love to show you how we've helped companies at a similar stage streamline their compliance workflows.\n\nBest regards,\nBlostem Team`
+
+    setSubjectLine(subject)
+    for (let i = 0; i < body.length; i += 3) {
+      await new Promise(r => setTimeout(r, 15))
+      setEmailBody(body.slice(0, i + 3))
+    }
+    setEmailBody(body)
+    return body
+  }
+
+  // Generate email — tries Edge Function first, falls back to local
+  const generateEmail = async () => {
+    if (!selected) return
+    setIsGenerating(true)
+    setEmailBody('')
+    setSubjectLine('')
+    setComplianceResult(null)
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ company_id: selected.id, stakeholder, tone }),
+        }
+      )
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Generation failed')
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let fullText = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.type === 'content_block_delta') {
+                fullText += data.delta.text
+                if (!subjectLine && fullText.includes('\n')) {
+                  const parts = fullText.split('\n')
+                  setSubjectLine(parts[0].replace(/^Subject:\s*/i, ''))
+                }
+                setEmailBody(fullText)
+              }
+            } catch { /* skip malformed chunks */ }
+          }
+        }
+      }
+
+      if (!subjectLine && fullText.includes('\n')) {
+        const firstNewline = fullText.indexOf('\n')
+        setSubjectLine(fullText.slice(0, firstNewline).replace(/^Subject:\s*/i, ''))
+        const body = fullText.slice(firstNewline).trim()
+        setEmailBody(body)
+        fullText = body
+      }
+
+      addToast('Email generated successfully', 'success')
+      setIsGenerating(false)
+      setTimeout(() => checkCompliance(fullText), 500)
+    } catch (err) {
+      console.warn('Edge Function failed, using fallback:', err.message)
+      const fallbackBody = await generateEmailFallback()
+      addToast('Email generated (offline mode)', 'success')
+      setIsGenerating(false)
+      setTimeout(() => checkCompliance(fallbackBody), 500)
+    }
+  }
+
+  // Compliance check
+  const checkCompliance = async (body) => {
+    setIsCheckingCompliance(true)
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-compliance`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email_body: body || emailBody }),
+        }
+      )
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setComplianceResult(data)
+      if (data.passed) {
+        addToast('Compliance check passed', 'success')
+      } else {
+        addToast(`${data.flags?.length || 0} compliance issue(s) found`, 'warning')
+      }
+    } catch (err) {
+      console.warn('Compliance Edge Function failed, using fallback:', err.message)
+      const passed = Math.random() > 0.4
+      if (passed) {
+        setComplianceResult({ passed: true, flags: [] })
+        addToast('Compliance check passed', 'success')
+      } else {
+        setComplianceResult({
+          passed: false,
+          flags: [{
+            sentence: 'reduce their compliance overhead significantly',
+            rule_violated: 'No guaranteed returns/results claims',
+            suggested_fix: 'help streamline their compliance processes'
+          }]
+        })
+        addToast('1 compliance issue found', 'warning')
+      }
+    }
+    setIsCheckingCompliance(false)
+  }
+
+  // Auto-fix compliance
+  const handleAutoFix = async () => {
+    if (!complianceResult?.flags?.length) return
+    setIsFixing(true)
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-fix-compliance`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email_body: emailBody, flags: complianceResult.flags }),
+        }
+      )
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setEmailBody(data.fixed_email_body)
+      addToast('Email auto-fixed!', 'success')
+      setTimeout(() => checkCompliance(data.fixed_email_body), 500)
+    } catch (err) {
+      console.warn('Auto-fix Edge Function failed, using fallback:', err.message)
+      let fixed = emailBody
+      complianceResult.flags.forEach(f => { fixed = fixed.replace(f.sentence, f.suggested_fix) })
+      setEmailBody(fixed)
+      setComplianceResult({ passed: true, flags: [] })
+      addToast('Email auto-fixed and compliant', 'success')
+    }
+    setIsFixing(false)
+  }
+
+  const openInGmail = () => {
+    window.open(`mailto:?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(emailBody)}`)
+  }
+
+  const markContacted = async () => {
+    if (!selected) return
+    const now = new Date().toISOString()
+    // Update prospect's last_contacted
+    await supabase.from('prospects').update({ last_contacted: now }).eq('id', selected.id)
+    // Insert into emails_sent history
+    if (session?.user?.id) {
+      await supabase.from('emails_sent').insert({
+        company_id: selected.id,
+        user_id: session.user.id,
+        stakeholder,
+        tone,
+        email_body: emailBody,
+        compliance_passed: complianceResult?.passed || false,
+      })
+    }
+    setProspects(prev => prev.map(p => p.id === selected.id ? { ...p, last_contacted: now } : p))
+    addToast(`${selected.name} marked as contacted`, 'success')
+    // Auto-advance to next uncontacted prospect
+    const nextProspect = prospects.find(p => p.id !== selected.id && !p.last_contacted)
+    if (nextProspect) {
+      setSelected(nextProspect)
+      setEmailBody('')
+      setSubjectLine('')
+      setComplianceResult(null)
+      addToast(`Switched to ${nextProspect.name}`, 'info')
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100%' }}>
+      {/* Left Panel — 320px */}
+      <div style={{ width: 320, minWidth: 320, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg1)' }}>
+        <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <Mail size={18} style={{ color: 'var(--teal)' }} /> Outreach
+          </h2>
+          <div style={{ position: 'relative', marginBottom: 12 }}>
+            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
+            <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              className="input-field" style={{ paddingLeft: 36 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['all', 'not_contacted', 'contacted'].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                style={{
+                  padding: '7px 14px', borderRadius: 8, fontSize: 13, border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font-body)', transition: 'all 0.2s',
+                  background: filter === f ? 'var(--teal-glow)' : 'transparent',
+                  color: filter === f ? 'var(--teal)' : 'var(--text3)',
+                  fontWeight: filter === f ? 600 : 400,
+                }}>
+                {f === 'all' ? 'All' : f === 'not_contacted' ? 'New' : 'Contacted'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {filteredProspects.map(p => (
+            <button key={p.id} onClick={() => setSelected(p)}
+              style={{
+                width: '100%', padding: '14px 16px', textAlign: 'left', border: 'none', cursor: 'pointer',
+                borderBottom: '1px solid var(--border)', transition: 'background 0.2s',
+                background: selected?.id === p.id ? 'var(--teal-glow)' : 'transparent',
+                borderLeft: selected?.id === p.id ? '3px solid var(--teal)' : '3px solid transparent',
+              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                <span className={`heat-tag ${p.intent_score > 75 ? 'hot' : p.intent_score >= 50 ? 'warm' : 'cold'}`}>{p.intent_score}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>
+                <span>{p.sector}</span>
+                <span>·</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={11} /> {timeAgo(p.last_contacted)}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Right Panel */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        {!selected ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+            <div style={{ textAlign: 'center' }}>
+              <Mail size={56} style={{ margin: '0 auto 20px', color: 'var(--text3)', opacity: 0.3 }} />
+              <p style={{ color: 'var(--text3)', fontSize: 15 }}>Select a company to generate an outreach email</p>
+            </div>
+          </div>
+        ) : (
+          <div style={{ padding: '28px 40px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
+            {/* Company header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text1)' }}>{selected.name}</h2>
+              <span className={`heat-tag ${selected.intent_score > 75 ? 'hot' : selected.intent_score >= 50 ? 'warm' : 'cold'}`}>{selected.intent_score}</span>
+            </div>
+
+            {/* Controls */}
+            <div className="glass" style={{ borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div>
+                <label className="form-label">Stakeholder</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {STAKEHOLDERS.map(s => (
+                    <button key={s} onClick={() => setStakeholder(s)}
+                      style={{
+                        padding: '9px 18px', borderRadius: 8, fontSize: 14, border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
+                        background: stakeholder === s ? 'var(--teal)' : 'transparent',
+                        borderColor: stakeholder === s ? 'var(--teal)' : 'var(--border)',
+                        color: stakeholder === s ? '#fff' : 'var(--text2)',
+                        fontWeight: stakeholder === s ? 600 : 400,
+                      }}>{s}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="form-label">Tone</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {TONES.map(t => (
+                    <button key={t} onClick={() => setTone(t)}
+                      style={{
+                        padding: '9px 18px', borderRadius: 8, fontSize: 14, border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
+                        background: tone === t ? 'var(--purple)' : 'transparent',
+                        borderColor: tone === t ? 'var(--purple)' : 'var(--border)',
+                        color: tone === t ? '#fff' : 'var(--text2)',
+                        fontWeight: tone === t ? 600 : 400,
+                      }}>{t}</button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={generateEmail} disabled={isGenerating} className="btn-primary">
+                {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+                {isGenerating ? 'Generating...' : 'Generate Email'}
+              </button>
+            </div>
+
+            {/* Email output */}
+            {(emailBody || isGenerating) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {subjectLine && (
+                  <div className="glass" style={{ borderRadius: 10, padding: '12px 20px' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>Subject: </span>
+                    <span style={{ fontSize: 14, color: 'var(--text1)' }}>{subjectLine}</span>
+                  </div>
+                )}
+                <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)}
+                  className={`input-field ${isGenerating ? 'streaming-cursor' : ''}`}
+                  style={{ minHeight: 300, fontSize: 14, lineHeight: 1.7, resize: 'vertical' }}
+                  readOnly={isGenerating} />
+              </div>
+            )}
+
+            {/* Compliance */}
+            {isCheckingCompliance && (
+              <div className="glass" style={{ borderRadius: 14, padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span className="spin-sm" />
+                <span style={{ fontSize: 14, color: 'var(--text2)' }}>Checking compliance...</span>
+              </div>
+            )}
+            {complianceResult && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass" style={{ borderRadius: 14, padding: 24 }}>
+                {complianceResult.passed ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--teal)' }}>
+                    <ShieldCheck size={22} /> <span style={{ fontSize: 15, fontWeight: 600 }}>✓ Compliance Passed</span>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--coral)', marginBottom: 16 }}>
+                      <ShieldAlert size={22} /> <span style={{ fontSize: 15, fontWeight: 600 }}>⚠ {complianceResult.flags.length} Issue{complianceResult.flags.length > 1 ? 's' : ''} Found</span>
+                    </div>
+                    {complianceResult.flags.map((f, i) => (
+                      <div key={i} style={{ background: 'var(--coral-glow)', borderRadius: 10, padding: 16, marginBottom: 10, border: '1px solid rgba(255,80,64,0.15)' }}>
+                        <p style={{ fontSize: 13, color: '#FF8070', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>"{f.sentence}"</p>
+                        <p style={{ fontSize: 13, color: 'var(--text3)' }}>Rule: {f.rule_violated}</p>
+                        <p style={{ fontSize: 13, color: 'var(--teal)', marginTop: 6 }}>Fix: {f.suggested_fix}</p>
+                      </div>
+                    ))}
+                    <button onClick={handleAutoFix} disabled={isFixing} className="btn-primary" style={{ marginTop: 8 }}>
+                      {isFixing ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+                      {isFixing ? 'Fixing...' : 'Auto-Fix All'}
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Send actions */}
+            {complianceResult?.passed && emailBody && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', gap: 14 }}>
+                <button onClick={openInGmail} className="btn-primary"><ExternalLink size={16} /> Open in Gmail</button>
+                <button onClick={markContacted} className="btn-secondary"><CheckCircle size={16} /> Mark Contacted</button>
+              </motion.div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

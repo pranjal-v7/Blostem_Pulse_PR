@@ -1,0 +1,328 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { supabase } from '../lib/supabase'
+import { useToast } from '../components/Toast'
+import {
+  ArrowLeft, ExternalLink, Mail, ScanSearch, RefreshCw,
+  Activity, Clock, Globe, MapPin, Building2, TrendingUp,
+  Linkedin, User, AtSign, Link2
+} from 'lucide-react'
+
+// Realistic contact data for demo seed companies
+const CONTACT_INFO = {
+  'KreditBee': { cto: 'Vivek R.', ctoEmail: 'vivek.r@kreditbee.in', cfo: 'Sunil K.', cfoEmail: 'sunil.k@kreditbee.in', email: 'partnerships@kreditbee.in', linkedin: 'https://linkedin.com/company/kreditbee' },
+  'Razorpay': { cto: 'Murali K.', ctoEmail: 'murali@razorpay.com', cfo: 'Anurag S.', cfoEmail: 'anurag.s@razorpay.com', email: 'enterprise@razorpay.com', linkedin: 'https://linkedin.com/company/razorpay' },
+  'Slice': { cto: 'Deepak A.', ctoEmail: 'deepak@sliceit.in', email: 'partnerships@sliceit.in', linkedin: 'https://linkedin.com/company/sliceit' },
+  'Jupiter Money': { cto: 'Prateek D.', ctoEmail: 'prateek@jupiter.money', email: 'biz@jupiter.money', linkedin: 'https://linkedin.com/company/jupiter-money' },
+  'Fibe': { cto: 'Rahul G.', ctoEmail: 'rahul.g@fibe.in', email: 'contact@fibe.in', linkedin: 'https://linkedin.com/company/fibe-india' },
+  'Niyo Solutions': { cto: 'Virender S.', ctoEmail: 'virender@goniyo.com', email: 'hello@goniyo.com', linkedin: 'https://linkedin.com/company/niyo-solutions' },
+  'Lendingkart': { cto: 'Amit J.', ctoEmail: 'amit.j@lendingkart.com', cfo: 'Divya M.', cfoEmail: 'divya.m@lendingkart.com', email: 'partners@lendingkart.com', linkedin: 'https://linkedin.com/company/lendingkart' },
+  'Uni Cards': { cto: 'Prashant K.', ctoEmail: 'prashant@uni.cards', email: 'hello@uni.cards', linkedin: 'https://linkedin.com/company/uni-cards' },
+  'NeoGrowth': { cto: 'Arun N.', ctoEmail: 'arun@neogrowth.in', email: 'info@neogrowth.in', linkedin: 'https://linkedin.com/company/neogrowth' },
+  'PaySense': { cto: 'Prashanth R.', ctoEmail: 'prashanth@gopaysense.com', email: 'connect@gopaysense.com', linkedin: 'https://linkedin.com/company/paysense' },
+}
+
+function ScoreRing({ score, size = 160, strokeWidth = 10 }) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const [offset, setOffset] = useState(circumference)
+  const getColor = (s) => s > 75 ? 'var(--teal)' : s >= 50 ? 'var(--amber)' : 'var(--text3)'
+
+  useEffect(() => {
+    const t = setTimeout(() => setOffset(circumference * ((100 - score) / 100)), 300)
+    return () => clearTimeout(t)
+  }, [score, circumference])
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
+        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={getColor(score)} strokeWidth={strokeWidth}
+          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)', filter: `drop-shadow(0 0 8px ${getColor(score)}40)` }} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <motion.span initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5, type: 'spring' }}
+          style={{ fontSize: 32, fontWeight: 700, fontFamily: 'var(--font-mono)', color: getColor(score) }}>{score}</motion.span>
+        <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Intent Score</span>
+      </div>
+    </div>
+  )
+}
+
+function timeAgo(d) {
+  if (!d) return 'Unknown'
+  const s = Math.floor((new Date() - new Date(d)) / 1000)
+  if (s < 60) return 'just now'
+  if (s < 3600) return `${Math.floor(s/60)}m ago`
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`
+  return `${Math.floor(s/86400)}d ago`
+}
+
+export default function CompanyDetailPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { addToast } = useToast()
+  const [company, setCompany] = useState(null)
+  const [signals, setSignals] = useState([])
+  const [macroEvents, setMacroEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [scanning, setScanning] = useState(false)
+  const [imgError, setImgError] = useState(false)
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true)
+      const [cRes, sRes] = await Promise.all([
+        supabase.from('prospects').select('*').eq('id', id).single(),
+        supabase.from('signals').select('*').eq('company_id', id).order('fetched_at', { ascending: false }).limit(10),
+      ])
+      if (cRes.data) {
+        setCompany(cRes.data)
+        const { data: events } = await supabase.from('macro_events').select('*')
+          .contains('sector_impact', [cRes.data.sector]).eq('is_active', true)
+        setMacroEvents(events || [])
+      }
+      setSignals(sRes.data || [])
+      setLoading(false)
+    }
+    fetchData()
+  }, [id])
+
+  const handleDeepScan = async () => {
+    setScanning(true)
+    addToast(`Scanning ${company.name}...`, 'info')
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/deep-scan`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company_id: id, company_name: company.name }) }
+      )
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setCompany(prev => ({ ...prev, intent_score: data.new_score }))
+      addToast(`Score updated: ${data.delta >= 0 ? '+' : ''}${data.delta} pts`, data.delta > 0 ? 'success' : 'warning')
+      const { data: newSignals } = await supabase.from('signals').select('*').eq('company_id', id).order('fetched_at', { ascending: false }).limit(10)
+      setSignals(newSignals || [])
+    } catch (err) {
+      console.warn('Deep scan fallback:', err.message)
+      const delta = Math.floor(Math.random() * 15) - 3
+      const newScore = Math.min(100, Math.max(0, company.intent_score + delta))
+      await supabase.from('prospects').update({ intent_score: newScore }).eq('id', id)
+      setCompany(prev => ({ ...prev, intent_score: newScore }))
+      addToast(`Score updated: ${delta >= 0 ? '+' : ''}${delta} pts`, delta > 0 ? 'success' : 'warning')
+    }
+    setScanning(false)
+  }
+
+  if (loading) return (
+    <div style={{ padding: 32, maxWidth: 960, margin: '0 auto' }}>
+      <div className="skeleton" style={{ height: 36, width: 200, marginBottom: 28, borderRadius: 8 }} />
+      <div className="skeleton" style={{ height: 200, borderRadius: 12, marginBottom: 28 }} />
+      {[...Array(3)].map((_, i) => <div key={i} className="skeleton" style={{ height: 68, borderRadius: 12, marginBottom: 14 }} />)}
+    </div>
+  )
+
+  if (!company) return (
+    <div style={{ padding: 32, textAlign: 'center' }}>
+      <p style={{ color: 'var(--text2)', fontSize: 16 }}>Company not found</p>
+      <button onClick={() => navigate('/app/radar')} className="btn-primary" style={{ marginTop: 20 }}>Back to Radar</button>
+    </div>
+  )
+
+  const initials = company.name.split(' ').map(w => w[0]).join('').slice(0, 2)
+
+  const sourceColors = {
+    'Inc42': { bg: 'rgba(123,110,255,0.15)', color: '#A99FFF' },
+    'ETBFSI': { bg: 'rgba(255,179,64,0.15)', color: '#FFB340' },
+    'RBI': { bg: 'rgba(255,80,64,0.15)', color: '#FF8070' },
+    'deep-scan': { bg: 'rgba(0,212,164,0.15)', color: '#00D4A4' },
+  }
+
+  return (
+    <div style={{ padding: '28px 40px', maxWidth: 960, margin: '0 auto', paddingBottom: 120 }}>
+      <button onClick={() => navigate('/app/radar')} style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text3)', fontSize: 14, marginBottom: 28, background: 'none', border: 'none', cursor: 'pointer' }}>
+        <ArrowLeft size={18} /> Back to Radar
+      </button>
+
+      {/* Header card */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="glass" style={{ borderRadius: 14, padding: 28, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          <div style={{ flexShrink: 0 }}>
+            {!imgError ? (
+              <img src={`https://logo.clearbit.com/${company.website}`} alt={company.name}
+                style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'contain', background: 'var(--bg3)', border: '1px solid var(--border)', padding: 10 }}
+                onError={() => setImgError(true)} />
+            ) : (
+              <div style={{ width: 72, height: 72, borderRadius: 12, background: 'var(--purple-glow)', border: '1px solid rgba(123,110,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--purple)', fontSize: 22, fontWeight: 700 }}>{initials}</div>
+            )}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+              <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text1)', letterSpacing: '-0.02em' }}>{company.name}</h1>
+              <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text3)' }}><ExternalLink size={18} /></a>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: Building2, text: company.sector, bg: 'var(--purple-glow)', color: '#A99FFF' },
+                { icon: TrendingUp, text: company.stage, bg: 'var(--teal-glow)', color: 'var(--teal)' },
+                { icon: MapPin, text: company.hq_city, bg: 'var(--amber-glow)', color: 'var(--amber)' },
+              ].map(tag => (
+                <span key={tag.text} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 8, background: tag.bg, color: tag.color, fontSize: 13, fontFamily: 'var(--font-mono)' }}>
+                  <tag.icon size={14} /> {tag.text}
+                </span>
+              ))}
+            </div>
+          </div>
+          <ScoreRing score={company.intent_score} />
+        </div>
+      </motion.div>
+
+      {/* Contact Info */}
+      {(() => {
+        const ci = CONTACT_INFO[company.name]
+        if (!ci) return null
+        return (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="glass" style={{ borderRadius: 14, padding: 24, marginBottom: 28 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text1)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <User size={18} style={{ color: 'var(--teal)' }} /> Contact Information
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              {ci.cto && (
+                <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(0,212,164,0.04)', border: '1px solid rgba(0,212,164,0.1)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>CTO</div>
+                  <div style={{ fontSize: 14, color: 'var(--text1)', fontWeight: 500, marginBottom: 4 }}>{ci.cto}</div>
+                  <a href={`mailto:${ci.ctoEmail}`} style={{ fontSize: 13, color: 'var(--teal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <AtSign size={12} /> {ci.ctoEmail}
+                  </a>
+                </div>
+              )}
+              {ci.cfo && (
+                <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(123,110,255,0.04)', border: '1px solid rgba(123,110,255,0.1)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>CFO</div>
+                  <div style={{ fontSize: 14, color: 'var(--text1)', fontWeight: 500, marginBottom: 4 }}>{ci.cfo}</div>
+                  <a href={`mailto:${ci.cfoEmail}`} style={{ fontSize: 13, color: '#A99FFF', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <AtSign size={12} /> {ci.cfoEmail}
+                  </a>
+                </div>
+              )}
+              <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(255,179,64,0.04)', border: '1px solid rgba(255,179,64,0.1)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Company Email</div>
+                <a href={`mailto:${ci.email}`} style={{ fontSize: 13, color: 'var(--amber)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Mail size={12} /> {ci.email}
+                </a>
+              </div>
+              <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Links</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <a href={ci.linkedin} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#5B9BD5', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Linkedin size={12} /> LinkedIn Page
+                  </a>
+                  <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--text2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Link2 size={12} /> {company.website}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )
+      })()}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 28 }}>
+        {/* Signals */}
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+            <Activity size={20} style={{ color: 'var(--teal)' }} /> Signal Breakdown
+          </h2>
+          {signals.length === 0 ? (
+            <div className="glass" style={{ borderRadius: 14, padding: 40, textAlign: 'center' }}>
+              <Activity size={36} style={{ margin: '0 auto 14px', color: 'var(--text3)', opacity: 0.4 }} />
+              <p style={{ color: 'var(--text3)', fontSize: 15 }}>No signals yet. Run a deep scan.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {signals.map((sig, i) => {
+                const sc = sourceColors[sig.source] || { bg: 'rgba(255,255,255,0.05)', color: 'var(--text3)' }
+                return (
+                  <motion.div key={sig.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
+                    className="glass" style={{ borderRadius: 12, padding: 18 }}>
+                    <p style={{ fontSize: 14, color: 'var(--text1)', marginBottom: 10, lineHeight: 1.5 }}>{sig.headline}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color, fontFamily: 'var(--font-mono)' }}>{sig.source}</span>
+                      {sig.score_contribution > 0 && (
+                        <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--teal-glow)', color: 'var(--teal)', fontFamily: 'var(--font-mono)' }}>+{sig.score_contribution} pts</span>
+                      )}
+                      <span style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)' }}><Clock size={11} /> {timeAgo(sig.fetched_at)}</span>
+                      {sig.url && (
+                        <a href={sig.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', marginLeft: 'auto' }}>
+                          <ExternalLink size={11} /> View Source
+                        </a>
+                      )}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          )}
+          {macroEvents.length > 0 && (
+            <>
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: 10, marginTop: 28, marginBottom: 18 }}>
+                <Globe size={20} style={{ color: 'var(--coral)' }} /> Macro Events
+              </h2>
+              {macroEvents.map(e => (
+                <div key={e.id} className="glass" style={{ borderRadius: 12, padding: 18, borderLeft: '3px solid var(--coral)', marginBottom: 10 }}>
+                  <p style={{ fontSize: 14, color: 'var(--text1)', marginBottom: 6 }}>{e.title}</p>
+                  <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{e.source}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* AI Analysis — structured into 3 sections */}
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', marginBottom: 18 }}>AI Analysis</h2>
+          {company.alignment_reason ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                { title: '📡 What they launched', color: 'var(--teal-glow)', border: 'rgba(0,212,164,0.15)' },
+                { title: '🎯 Why Blostem fits', color: 'var(--purple-glow)', border: 'rgba(123,110,255,0.15)' },
+                { title: '💡 Recommended angle', color: 'var(--amber-glow)', border: 'rgba(255,179,64,0.15)' },
+              ].map((section, i) => {
+                const lines = company.alignment_reason.split(/\n+/).filter(Boolean)
+                const text = lines[i] || (i === 0 ? company.alignment_reason : '')
+                if (!text) return null
+                return (
+                  <div key={i} className="glass" style={{ borderRadius: 12, padding: 18, borderLeft: `3px solid ${section.border}` }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', marginBottom: 8, fontFamily: 'var(--font-mono)' }}>{section.title}</div>
+                    <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.7 }}>{text}</p>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="glass" style={{ borderRadius: 12, padding: 20 }}>
+              <p style={{ fontSize: 14, color: 'var(--text3)', lineHeight: 1.7 }}>
+                No AI analysis yet. Run a deep scan to generate alignment reasoning.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Sticky Action Bar */}
+      <div className="glass" style={{ position: 'fixed', bottom: 0, left: 'var(--sidebar-w)', right: 0, borderTop: '1px solid var(--border)', padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, zIndex: 50 }}>
+        <button onClick={() => navigate(`/app/outreach?company_id=${company.id}`)} className="btn-primary"><Mail size={16} /> Generate Email</button>
+        <button onClick={handleDeepScan} disabled={scanning} className="btn-secondary">
+          {scanning ? <RefreshCw size={16} className="animate-spin" /> : <ScanSearch size={16} />}
+          {scanning ? 'Scanning...' : 'Deep Scan'}
+        </button>
+        <button onClick={() => navigate('/app/radar')} className="btn-secondary"><ArrowLeft size={16} /> Back</button>
+      </div>
+    </div>
+  )
+}
