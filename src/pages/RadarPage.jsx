@@ -267,7 +267,7 @@ export default function RadarPage() {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/deep-scan`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
           body: JSON.stringify({ company_id: prospect.id, company_name: prospect.name }) })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -300,7 +300,7 @@ export default function RadarPage() {
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/deep-scan`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
             body: JSON.stringify({ company_id: prospect.id, company_name: prospect.name }),
           }
         )

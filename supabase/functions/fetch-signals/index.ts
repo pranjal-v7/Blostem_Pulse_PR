@@ -10,10 +10,15 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // RSS feed URLs
+    // RSS feed URLs — multi-source coverage
     const feeds = [
       { name: "Inc42", url: "https://inc42.com/feed/" },
       { name: "ETBFSI", url: "https://etbfsi.com/feed/" },
+      { name: "YourStory", url: "https://yourstory.com/feed" },
+      { name: "Entrackr", url: "https://entrackr.com/feed/" },
+      { name: "LiveMint", url: "https://www.livemint.com/rss/companies" },
+      { name: "Moneycontrol", url: "https://www.moneycontrol.com/rss/business.xml" },
+      { name: "Economic Times", url: "https://economictimes.indiatimes.com/rssfeedstopstories.cms" },
     ];
 
     // Get all prospects

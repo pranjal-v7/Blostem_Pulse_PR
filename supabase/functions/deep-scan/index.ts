@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
     if (serpApiKey) {
       // Build multi-source query
-      const siteQuery = NEWS_SOURCES.slice(0, 5).map(s => `site:${s.site}`).join(" OR ");
+      const siteQuery = NEWS_SOURCES.map(s => `site:${s.site}`).join(" OR ");
       const query = encodeURIComponent(`${company_name} ${siteQuery}`);
       const serpUrl = `https://serpapi.com/search.json?q=${query}&num=8&api_key=${serpApiKey}`;
       const serpRes = await fetch(serpUrl);
