@@ -33,24 +33,35 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   const { user, loading } = useAuth()
 
-  // One-time script to inject 3 "truly new" discovered companies to fix the counts for the demo
+  // Seed 3 demo "freshly discovered" companies — idempotent: queries first, only inserts what's missing
   useEffect(() => {
     async function injectNewCompanies() {
       if (!user) return;
-      if (localStorage.getItem('demo_new_companies_injected')) return;
-      
-      const newCompanies = [
+
+      const SEED_COMPANIES = [
         { name: 'Groww', sector: 'Wealthtech', stage: 'Late Stage', hq_city: 'Bengaluru', is_new_entrant: true, intent_score: 82 },
         { name: 'Zerodha', sector: 'Wealthtech', stage: 'Bootstrapped', hq_city: 'Bengaluru', is_new_entrant: true, intent_score: 91 },
-        { name: 'Navi', sector: 'Lending', stage: 'Late Stage', hq_city: 'Bengaluru', is_new_entrant: true, intent_score: 65 }
+        { name: 'Navi', sector: 'Lending', stage: 'Late Stage', hq_city: 'Bengaluru', is_new_entrant: true, intent_score: 65 },
       ];
-      
+      const seedNames = SEED_COMPANIES.map(c => c.name);
+
       try {
-        await supabase.from('prospects').insert(newCompanies);
-        localStorage.setItem('demo_new_companies_injected', 'true');
-        console.log("Injected new companies for demo!");
+        // Step 1: Check which names already exist in the DB
+        const { data: existing } = await supabase
+          .from('prospects')
+          .select('name')
+          .in('name', seedNames);
+
+        const existingNames = new Set((existing || []).map(r => r.name));
+
+        // Step 2: Only insert companies that are NOT already present
+        const toInsert = SEED_COMPANIES.filter(c => !existingNames.has(c.name));
+        if (toInsert.length > 0) {
+          await supabase.from('prospects').insert(toInsert);
+          console.log(`Seeded ${toInsert.length} new demo company/companies.`);
+        }
       } catch (err) {
-        console.error("Failed to inject demo companies", err);
+        console.error('Demo seed failed:', err);
       }
     }
     injectNewCompanies();

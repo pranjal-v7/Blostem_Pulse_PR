@@ -318,7 +318,15 @@ export default function RadarPage() {
         .eq('is_new_entrant', true)
         .gte('created_at', since)
         .order('created_at', { ascending: false })
-      setUnvalidatedProspects(data || [])
+      // Deduplicate by name — keep earliest row for each company name
+      const seen = new Set()
+      const deduped = (data || []).filter(p => {
+        if (seen.has(p.name)) return false
+        seen.add(p.name)
+        return true
+      })
+      setUnvalidatedProspects(deduped)
+
     }
     fetchDiscovered()
 
