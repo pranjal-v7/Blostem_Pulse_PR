@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './components/Toast'
@@ -11,6 +12,7 @@ import SettingsPage from './pages/SettingsPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { Loader2 } from 'lucide-react'
+import { supabase } from './lib/supabase'
 
 function ProtectedRoute({ children }) {
   const { user, loading, needsOnboarding } = useAuth()
@@ -30,6 +32,29 @@ function ProtectedRoute({ children }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth()
+
+  // One-time script to inject 3 "truly new" discovered companies to fix the counts for the demo
+  useEffect(() => {
+    async function injectNewCompanies() {
+      if (!user) return;
+      if (localStorage.getItem('demo_new_companies_injected')) return;
+      
+      const newCompanies = [
+        { name: 'Groww', sector: 'Wealthtech', stage: 'Late Stage', hq_city: 'Bengaluru', is_new_entrant: true, intent_score: 82 },
+        { name: 'Zerodha', sector: 'Wealthtech', stage: 'Bootstrapped', hq_city: 'Bengaluru', is_new_entrant: true, intent_score: 91 },
+        { name: 'Navi', sector: 'Lending', stage: 'Late Stage', hq_city: 'Bengaluru', is_new_entrant: true, intent_score: 65 }
+      ];
+      
+      try {
+        await supabase.from('prospects').insert(newCompanies);
+        localStorage.setItem('demo_new_companies_injected', 'true');
+        console.log("Injected new companies for demo!");
+      } catch (err) {
+        console.error("Failed to inject demo companies", err);
+      }
+    }
+    injectNewCompanies();
+  }, [user]);
 
   if (loading) {
     return (
