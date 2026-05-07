@@ -247,8 +247,8 @@ export default function OutreachPage() {
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
-      {/* Left Panel — 320px */}
-      <div style={{ width: 320, minWidth: 320, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg1)' }}>
+      {/* Left Panel — 340px (expanded 20px) */}
+      <div style={{ width: 340, minWidth: 340, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg1)' }}>
         <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <Mail size={18} style={{ color: 'var(--teal)' }} /> Outreach
@@ -258,7 +258,7 @@ export default function OutreachPage() {
             <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               className="input-field" style={{ paddingLeft: 36 }} />
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
             {['all', 'not_contacted', 'contacted'].map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 style={{
@@ -274,7 +274,9 @@ export default function OutreachPage() {
           </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {filteredProspects.map(p => (
+          {filteredProspects.map(p => {
+            const domain = p.website?.replace(/^https?:\/\//, '').replace(/\/$/, '')
+            return (
             <button key={p.id} onClick={() => setSelected(p)}
               style={{
                 width: '100%', padding: '14px 16px', textAlign: 'left', border: 'none', cursor: 'pointer',
@@ -282,17 +284,25 @@ export default function OutreachPage() {
                 background: selected?.id === p.id ? 'var(--teal-glow)' : 'transparent',
                 borderLeft: selected?.id === p.id ? '3px solid var(--teal)' : '3px solid transparent',
               }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                <span className={`heat-tag ${p.intent_score > 75 ? 'hot' : p.intent_score >= 50 ? 'warm' : 'cold'}`}>{p.intent_score}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>
-                <span>{p.sector}</span>
-                <span>·</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={11} /> {timeAgo(p.last_contacted)}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#ffffff', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                  <img src={`https://logo.clearbit.com/${domain}`} alt="" style={{ width: 22, height: 22, objectFit: 'contain' }} onError={e => { e.target.style.display = 'none' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                    <span className={`heat-tag ${p.intent_score > 75 ? 'hot' : p.intent_score >= 50 ? 'warm' : 'cold'}`}>{p.intent_score}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>
+                    <span>{p.sector}</span>
+                    <span>·</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={11} /> {timeAgo(p.last_contacted)}</span>
+                  </div>
+                </div>
               </div>
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -307,16 +317,19 @@ export default function OutreachPage() {
           </div>
         ) : (
           <div style={{ padding: '28px 40px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
-            {/* Company header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text1)' }}>{selected.name}</h2>
+            {/* Company header with logo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: '#ffffff', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                <img src={`https://logo.clearbit.com/${selected.website?.replace(/^https?:\/\//, '').replace(/\/$/, '')}`} alt="" style={{ width: 30, height: 30, objectFit: 'contain' }} onError={e => { e.target.style.display = 'none' }} />
+              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#ffffff' }}>{selected.name}</h2>
               <span className={`heat-tag ${selected.intent_score > 75 ? 'hot' : selected.intent_score >= 50 ? 'warm' : 'cold'}`}>{selected.intent_score}</span>
             </div>
 
             {/* Controls */}
             <div className="glass" style={{ borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
-                <label className="form-label">Stakeholder</label>
+                <label style={{ fontSize: 12, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'block', fontWeight: 500 }}>Stakeholder</label>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {STAKEHOLDERS.map(s => (
                     <button key={s} onClick={() => setStakeholder(s)}
@@ -324,14 +337,14 @@ export default function OutreachPage() {
                         padding: '9px 18px', borderRadius: 8, fontSize: 14, border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
                         background: stakeholder === s ? 'var(--teal)' : 'transparent',
                         borderColor: stakeholder === s ? 'var(--teal)' : 'var(--border)',
-                        color: stakeholder === s ? '#fff' : 'var(--text2)',
+                        color: stakeholder === s ? '#fff' : '#ffffff',
                         fontWeight: stakeholder === s ? 600 : 400,
                       }}>{s}</button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="form-label">Tone</label>
+                <label style={{ fontSize: 12, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'block', fontWeight: 500 }}>Tone</label>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {TONES.map(t => (
                     <button key={t} onClick={() => setTone(t)}
@@ -339,7 +352,7 @@ export default function OutreachPage() {
                         padding: '9px 18px', borderRadius: 8, fontSize: 14, border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
                         background: tone === t ? 'var(--purple)' : 'transparent',
                         borderColor: tone === t ? 'var(--purple)' : 'var(--border)',
-                        color: tone === t ? '#fff' : 'var(--text2)',
+                        color: tone === t ? '#fff' : '#ffffff',
                         fontWeight: tone === t ? 600 : 400,
                       }}>{t}</button>
                   ))}
@@ -356,8 +369,8 @@ export default function OutreachPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {subjectLine && (
                   <div className="glass" style={{ borderRadius: 10, padding: '12px 20px' }}>
-                    <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>Subject: </span>
-                    <span style={{ fontSize: 14, color: 'var(--text1)' }}>{subjectLine}</span>
+                    <span style={{ fontSize: 12, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>Subject: </span>
+                    <span style={{ fontSize: 14, color: '#ffffff' }}>{subjectLine}</span>
                   </div>
                 )}
                 <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)}

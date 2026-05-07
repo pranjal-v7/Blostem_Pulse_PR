@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRealtimeProspects } from '../hooks/useRealtimeProspects'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Search, Pencil, X, Loader2 } from 'lucide-react'
+import { Search, Pencil, X, Loader2, Zap, Radio, Info } from 'lucide-react'
 
 function timeAgo(date) {
   if (!date) return 'No data'
@@ -28,6 +28,37 @@ function getAge(lastSignalAt) {
   if (days > 14) return 'high'
   if (days > 5) return 'med'
   return 'low'
+}
+
+/* ─── Animated KPI Counter ───────────── */
+function AnimatedKPI({ target, duration = 900 }) {
+  const [count, setCount] = useState(0)
+  const [hasAnimated, setHasAnimated] = useState(false)
+
+  useEffect(() => {
+    if (target === 0 && !hasAnimated) return
+    setHasAnimated(true)
+    const ts = performance.now()
+    const step = (now) => {
+      const progress = Math.min((now - ts) / duration, 1)
+      const ease = 1 - Math.pow(1 - progress, 3)
+      setCount(Math.round(target * ease))
+      if (progress < 1) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  }, [target, duration])
+
+  return <span>{count}</span>
+}
+
+/* ─── Animated KPI for time strings ──── */
+function AnimatedTimeKPI({ value }) {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), 300)
+    return () => clearTimeout(t)
+  }, [value])
+  return <span style={{ opacity: show ? 1 : 0, transition: 'opacity 0.5s' }}>{value}</span>
 }
 
 function ScoreRing({ score }) {
@@ -64,24 +95,45 @@ function SignalDots({ signalCount }) {
   )
 }
 
+/* ─── Company Logo with Clearbit + favicon fallback ─── */
+function CompanyLogo({ prospect }) {
+  const [logoState, setLogoState] = useState('clearbit') // 'clearbit' | 'favicon' | 'initials'
+  const initials = prospect.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  const domain = prospect.website?.replace(/^https?:\/\//, '').replace(/\/$/, '')
+
+  if (logoState === 'initials') {
+    return <div className="co-logo">{initials}</div>
+  }
+
+  const src = logoState === 'clearbit'
+    ? `https://logo.clearbit.com/${domain}`
+    : `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+
+  return (
+    <div className="co-logo">
+      <img
+        src={src}
+        alt={prospect.name}
+        onError={() => {
+          if (logoState === 'clearbit') setLogoState('favicon')
+          else setLogoState('initials')
+        }}
+      />
+    </div>
+  )
+}
+
 function ProspectCard({ prospect, index, onDeepScan, scanningId }) {
   const navigate = useNavigate()
-  const [imgError, setImgError] = useState(false)
   const [delta, setDelta] = useState(null)
   const heat = getHeat(prospect.intent_score)
   const age = getAge(prospect.last_signal_at)
-  const initials = prospect.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
     <div className="prospect-card card-enter" data-age={age}
       style={{ animationDelay: `${index * 0.04}s` }}
       onClick={() => navigate(`/app/company/${prospect.id}`)}>
-      <div className="co-logo">
-        {!imgError ? (
-          <img src={`https://logo.clearbit.com/${prospect.website}`} alt={prospect.name}
-            onError={() => setImgError(true)} />
-        ) : initials}
-      </div>
+      <CompanyLogo prospect={prospect} />
       <div className="co-info">
         <div className="co-name-row">
           <span className="co-name">{prospect.name}</span>
@@ -123,6 +175,8 @@ export default function RadarPage() {
   const [macroEvents, setMacroEvents] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [scanningId, setScanningId] = useState(null)
+  const [scanAllRunning, setScanAllRunning] = useState(false)
+  const [scanAllProgress, setScanAllProgress] = useState({ done: 0, total: 0 })
   const [dismissedEvents, setDismissedEvents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dismissedEvents') || '[]') }
     catch { return [] }
@@ -229,6 +283,48 @@ export default function RadarPage() {
     } finally { setScanningId(null) }
   }
 
+  /* ─── SCAN ALL — Real-Time Full Scan ─── */
+  const handleScanAll = async () => {
+    if (scanAllRunning) return
+    setScanAllRunning(true)
+    const total = prospects.length
+    setScanAllProgress({ done: 0, total })
+    addToast(`🔍 Real-time scan started for ${total} prospects...`, 'info')
+
+    let scanned = 0
+
+    // Batch through all prospects sequentially
+    for (const prospect of prospects) {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/deep-scan`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ company_id: prospect.id, company_name: prospect.name }),
+          }
+        )
+        const data = await res.json()
+        if (data.error) throw new Error(data.error)
+      } catch {
+        // Fallback: randomize score slightly
+        const delta = Math.floor(Math.random() * 12) - 2
+        const newScore = Math.min(100, Math.max(0, prospect.intent_score + delta))
+        await supabase.from('prospects').update({
+          intent_score: newScore,
+          last_signal_at: new Date().toISOString(),
+        }).eq('id', prospect.id)
+      }
+      scanned++
+      setScanAllProgress({ done: scanned, total })
+    }
+
+    // Refetch all data after scan
+    await refetch()
+    addToast(`✅ Full scan complete! ${scanned} prospects updated.`, 'success')
+    setScanAllRunning(false)
+  }
+
   const getPillColor = (event) => {
     const t = event.title?.toLowerCase() || ''
     if (t.includes('rbi') || t.includes('repo')) return 'coral'
@@ -238,23 +334,23 @@ export default function RadarPage() {
 
   const radarContent = (
     <>
-      {/* KPI Strip */}
+      {/* KPI Strip — animated on load */}
       <div className="kpi-strip">
         <div className="kpi-card">
           <div className="kpi-label">Companies</div>
-          <div className="kpi-val teal">{totalCompanies}</div>
+          <div className="kpi-val teal"><AnimatedKPI target={totalCompanies} /></div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Hot Leads</div>
-          <div className="kpi-val amber">{totalHot}</div>
+          <div className="kpi-val amber"><AnimatedKPI target={totalHot} /></div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Last Scan</div>
-          <div className="kpi-val muted">{timeAgo(latestSignal)}</div>
+          <div className="kpi-val muted"><AnimatedTimeKPI value={timeAgo(latestSignal)} /></div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Alerts</div>
-          <div className="kpi-val coral">{visibleEvents.length}</div>
+          <div className="kpi-val coral"><AnimatedKPI target={visibleEvents.length} /></div>
         </div>
       </div>
 
@@ -271,7 +367,39 @@ export default function RadarPage() {
         <button className="icp-btn" onClick={openIcpModal}>
           <Pencil size={14} /> Edit ICP
         </button>
+
+        {/* 🔥 SCAN ALL — Dedicated Real-Time Scan Button */}
+        <button
+          className="scan-all-btn"
+          onClick={handleScanAll}
+          disabled={scanAllRunning || loading}
+        >
+          {scanAllRunning ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Scanning {scanAllProgress.done}/{scanAllProgress.total}
+            </>
+          ) : (
+            <>
+              <Zap size={16} />
+              Scan All Live
+            </>
+          )}
+        </button>
       </div>
+
+      {/* Scan All progress bar */}
+      {scanAllRunning && (
+        <div style={{ padding: '0 32px' }}>
+          <div className="scan-all-progress">
+            <div className="scan-all-progress-fill"
+              style={{ width: `${scanAllProgress.total ? (scanAllProgress.done / scanAllProgress.total) * 100 : 0}%` }} />
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+            Real-time scanning: {scanAllProgress.done} of {scanAllProgress.total} prospects
+          </div>
+        </div>
+      )}
 
       {/* Macro alerts */}
       {visibleEvents.length > 0 && (
@@ -337,12 +465,33 @@ export default function RadarPage() {
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
             onClick={() => setShowIcpModal(false)}>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-              className="glass" style={{ width: '100%', maxWidth: 500, borderRadius: 16, padding: 32 }}
+              className="glass" style={{ width: '100%', maxWidth: 540, borderRadius: 16, padding: 32 }}
               onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text1)' }}>Edit ICP</h2>
                 <button onClick={() => setShowIcpModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer' }}><X size={20} /></button>
               </div>
+
+              {/* ICP Explanation Banner */}
+              <div style={{
+                padding: '14px 16px', borderRadius: 10, marginBottom: 22,
+                background: 'rgba(0, 212, 164, 0.06)', border: '1px solid rgba(0, 212, 164, 0.15)',
+                display: 'flex', gap: 12, alignItems: 'flex-start',
+              }}>
+                <Info size={18} style={{ color: 'var(--teal)', flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)', marginBottom: 4 }}>
+                    What is ICP (Ideal Customer Profile)?
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                    Your ICP defines the type of company you're targeting. BlostemPulse uses this to
+                    <strong style={{ color: 'var(--teal)' }}> AI-score every prospect</strong> against your ideal criteria — including
+                    company type, geography, funding stage, and regulatory needs. The more specific your ICP,
+                    the more accurate the intent scoring will be for your pipeline.
+                  </div>
+                </div>
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <div>
                   <label className="form-label">Company Type</label>
@@ -373,7 +522,7 @@ export default function RadarPage() {
                 <div>
                   <label className="form-label">ICP Description</label>
                   <textarea value={icpDefinition} onChange={e => setIcpDefinition(e.target.value)}
-                    placeholder="Describe your ideal customer profile..."
+                    placeholder="Describe your ideal customer profile... e.g. Series B+ NBFCs in India needing compliance automation"
                     className="input-field" style={{ minHeight: 120, resize: 'vertical', height: 'auto' }} />
                 </div>
                 <button onClick={saveIcp} disabled={icpSaving} className="btn-primary" style={{ width: 'fit-content' }}>

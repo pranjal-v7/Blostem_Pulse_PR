@@ -56,6 +56,10 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
+  // Sign-up extra fields
+  const [fullName, setFullName] = useState('')
+  const [age, setAge] = useState('')
+  const [department, setDepartment] = useState('')
   const { signIn, signUp } = useAuth()
   const { addToast } = useToast()
   const navigate = useNavigate()
@@ -67,7 +71,16 @@ export default function LoginPage() {
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        addToast('Account created! Check your email to confirm.', 'success')
+        // Save profile data to database
+        if (data?.user?.id) {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            display_name: fullName,
+            age: age ? parseInt(age) : null,
+            department,
+          })
+        }
+        addToast('Account created! Welcome to BlostemPulse.', 'success')
         navigate('/app/radar')
       } else {
         const { error } = await signIn(email, password)
@@ -140,8 +153,8 @@ export default function LoginPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>
           <BlostemLogoBig />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--text1)', letterSpacing: '-0.02em' }}>blostem</span>
-            <span style={{ fontSize: 18, fontWeight: 500, color: 'var(--teal)', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>PULSE</span>
+            <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text1)', letterSpacing: '-0.02em' }}>Blostem</span>
+            <span style={{ fontSize: 20, fontWeight: 500, color: 'var(--teal)', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>PULSE</span>
           </div>
         </div>
 
@@ -249,7 +262,36 @@ export default function LoginPage() {
                 {isSignUp ? 'Get started with BlostemPulse' : 'Sign in to your dashboard'}
               </p>
 
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Name — only in sign-up */}
+                {isSignUp && (
+                  <div>
+                    <label className="form-label">Full Name</label>
+                    <input className="input-field" type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="John Doe" required />
+                  </div>
+                )}
+                {/* Age & Department — only in sign-up */}
+                {isSignUp && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label className="form-label">Age</label>
+                      <input className="input-field" type="number" min="16" max="99" value={age} onChange={e => setAge(e.target.value)} placeholder="25" required />
+                    </div>
+                    <div>
+                      <label className="form-label">Department</label>
+                      <select className="input-field" value={department} onChange={e => setDepartment(e.target.value)} required style={{ cursor: 'pointer' }}>
+                        <option value="">Select...</option>
+                        <option value="Sales">Sales</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Engineering">Engineering</option>
+                        <option value="Product">Product</option>
+                        <option value="Compliance">Compliance</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Operations">Operations</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="form-label">Email</label>
                   <input className="input-field" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required />

@@ -114,11 +114,11 @@ html, body, #root {
   display: flex; flex-direction: column; line-height: 1.15;
 }
 .sb-brand-name {
-  font-size: 15px; font-weight: 700; color: var(--text1);
+  font-size: 17px; font-weight: 700; color: var(--text1);
   letter-spacing: -0.02em;
 }
 .sb-brand-sub {
-  font-size: 10px; font-weight: 500; color: var(--teal);
+  font-size: 11px; font-weight: 500; color: var(--teal);
   font-family: var(--font-mono); letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -410,6 +410,60 @@ html, body, #root {
   height: 42px;
 }
 .icp-btn:hover { background: rgba(123,110,255,0.12); border-color: rgba(123,110,255,0.35); }
+
+/* ─── SCAN ALL BUTTON ────────────────── */
+.scan-all-btn {
+  font-size: 13px; font-family: var(--font-mono);
+  padding: 8px 20px; border-radius: 8px;
+  background: linear-gradient(135deg, rgba(0,212,164,0.15), rgba(0,212,164,0.05));
+  border: 1px solid rgba(0,212,164,0.3);
+  color: var(--teal); cursor: pointer;
+  transition: all 0.3s; display: flex; align-items: center; gap: 8px;
+  height: 42px; white-space: nowrap;
+  position: relative; overflow: hidden;
+}
+.scan-all-btn::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(0,212,164,0.08), transparent);
+  animation: scanShimmer 2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes scanShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.scan-all-btn:hover {
+  background: linear-gradient(135deg, rgba(0,212,164,0.25), rgba(0,212,164,0.1));
+  border-color: rgba(0,212,164,0.5);
+  box-shadow: 0 0 20px rgba(0,212,164,0.15);
+  transform: translateY(-1px);
+}
+.scan-all-btn:disabled {
+  cursor: not-allowed;
+  animation: scanPulse 1.5s ease-in-out infinite;
+}
+@keyframes scanPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(0,212,164,0.1); }
+  50% { box-shadow: 0 0 20px rgba(0,212,164,0.25); }
+}
+
+/* ─── SCAN ALL PROGRESS BAR ──────────── */
+.scan-all-progress {
+  height: 3px; border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden; margin-top: 12px;
+}
+.scan-all-progress-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--teal-dim), var(--teal));
+  transition: width 0.4s ease;
+  position: relative;
+}
+.scan-all-progress-fill::after {
+  content: ''; position: absolute; right: 0; top: -2px; bottom: -2px; width: 8px;
+  background: var(--teal); border-radius: 50%;
+  box-shadow: 0 0 8px var(--teal);
+}
 
 /* delta flash */
 .delta-flash {

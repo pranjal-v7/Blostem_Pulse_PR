@@ -6,7 +6,7 @@ import { useToast } from '../components/Toast'
 import {
   ArrowLeft, ExternalLink, Mail, ScanSearch, RefreshCw,
   Activity, Clock, Globe, MapPin, Building2, TrendingUp,
-  Linkedin, User, AtSign, Link2
+  Linkedin, User, AtSign, Link2, Loader2
 } from 'lucide-react'
 
 // Realistic contact data for demo seed companies
@@ -104,7 +104,7 @@ export default function CompanyDetailPage() {
       if (data.error) throw new Error(data.error)
       setCompany(prev => ({ ...prev, intent_score: data.new_score }))
       addToast(`Score updated: ${data.delta >= 0 ? '+' : ''}${data.delta} pts`, data.delta > 0 ? 'success' : 'warning')
-      const { data: newSignals } = await supabase.from('signals').select('*').eq('company_id', id).order('fetched_at', { ascending: false }).limit(10)
+      const { data: newSignals } = await supabase.from('signals').select('*').eq('company_id', id).order('fetched_at', { ascending: false }).limit(20)
       setSignals(newSignals || [])
     } catch (err) {
       console.warn('Deep scan fallback:', err.message)
@@ -139,6 +139,13 @@ export default function CompanyDetailPage() {
     'ETBFSI': { bg: 'rgba(255,179,64,0.15)', color: '#FFB340' },
     'RBI': { bg: 'rgba(255,80,64,0.15)', color: '#FF8070' },
     'deep-scan': { bg: 'rgba(0,212,164,0.15)', color: '#00D4A4' },
+    'YourStory': { bg: 'rgba(255,100,150,0.15)', color: '#FF6496' },
+    'Moneycontrol': { bg: 'rgba(64,180,255,0.15)', color: '#40B4FF' },
+    'LiveMint': { bg: 'rgba(255,140,50,0.15)', color: '#FF8C32' },
+    'Economic Times': { bg: 'rgba(200,200,64,0.15)', color: '#C8C840' },
+    'Entrackr': { bg: 'rgba(180,100,255,0.15)', color: '#B464FF' },
+    'TechCrunch': { bg: 'rgba(0,200,80,0.15)', color: '#00C850' },
+    'VCCircle': { bg: 'rgba(255,200,0,0.15)', color: '#FFC800' },
   }
 
   return (
@@ -161,10 +168,13 @@ export default function CompanyDetailPage() {
             )}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 4 }}>
               <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text1)', letterSpacing: '-0.02em' }}>{company.name}</h1>
               <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text3)' }}><ExternalLink size={18} /></a>
             </div>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 10, fontFamily: 'var(--font-mono)' }}>
+              {company.sector} · {company.stage} · {company.hq_city}{company.website ? ` · ${company.website}` : ''}
+            </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {[
                 { icon: Building2, text: company.sector, bg: 'var(--purple-glow)', color: '#A99FFF' },
@@ -194,35 +204,35 @@ export default function CompanyDetailPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
               {ci.cto && (
                 <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(0,212,164,0.04)', border: '1px solid rgba(0,212,164,0.1)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>CTO</div>
-                  <div style={{ fontSize: 14, color: 'var(--text1)', fontWeight: 500, marginBottom: 4 }}>{ci.cto}</div>
-                  <a href={`mailto:${ci.ctoEmail}`} style={{ fontSize: 13, color: 'var(--teal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>CTO</div>
+                  <div style={{ fontSize: 14, color: '#ffffff', fontWeight: 500, marginBottom: 4 }}>{ci.cto}</div>
+                  <a href={`mailto:${ci.ctoEmail}`} style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <AtSign size={12} /> {ci.ctoEmail}
                   </a>
                 </div>
               )}
               {ci.cfo && (
                 <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(123,110,255,0.04)', border: '1px solid rgba(123,110,255,0.1)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>CFO</div>
-                  <div style={{ fontSize: 14, color: 'var(--text1)', fontWeight: 500, marginBottom: 4 }}>{ci.cfo}</div>
-                  <a href={`mailto:${ci.cfoEmail}`} style={{ fontSize: 13, color: '#A99FFF', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>CFO</div>
+                  <div style={{ fontSize: 14, color: '#ffffff', fontWeight: 500, marginBottom: 4 }}>{ci.cfo}</div>
+                  <a href={`mailto:${ci.cfoEmail}`} style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <AtSign size={12} /> {ci.cfoEmail}
                   </a>
                 </div>
               )}
               <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(255,179,64,0.04)', border: '1px solid rgba(255,179,64,0.1)' }}>
-                <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Company Email</div>
-                <a href={`mailto:${ci.email}`} style={{ fontSize: 13, color: 'var(--amber)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Company Email</div>
+                <a href={`mailto:${ci.email}`} style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                   <Mail size={12} /> {ci.email}
                 </a>
               </div>
               <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Links</div>
+                <div style={{ fontSize: 11, color: '#ffffff', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Links</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <a href={ci.linkedin} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#5B9BD5', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <a href={ci.linkedin} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <Linkedin size={12} /> LinkedIn Page
                   </a>
-                  <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--text2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <Link2 size={12} /> {company.website}
                   </a>
                 </div>
@@ -237,61 +247,96 @@ export default function CompanyDetailPage() {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
             <Activity size={20} style={{ color: 'var(--teal)' }} /> Signal Breakdown
+            {scanning && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--teal)', marginLeft: 'auto' }} />}
           </h2>
-          {signals.length === 0 ? (
+
+          {/* Scan loading animation */}
+          {scanning && (
+            <div className="glass" style={{ borderRadius: 12, padding: 20, marginBottom: 14, borderLeft: '3px solid var(--teal)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Loader2 size={20} className="animate-spin" style={{ color: 'var(--teal)' }} />
+                <div>
+                  <div style={{ fontSize: 14, color: 'var(--text1)', fontWeight: 500 }}>Scanning sources in real-time...</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                    Inc42 · ETBFSI · YourStory · Moneycontrol · LiveMint · Economic Times
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 12, height: 3, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', borderRadius: 3, background: 'var(--teal)', animation: 'scanSlide 1.5s ease-in-out infinite', width: '40%' }} />
+              </div>
+            </div>
+          )}
+
+          {signals.length === 0 && !scanning ? (
             <div className="glass" style={{ borderRadius: 14, padding: 40, textAlign: 'center' }}>
               <Activity size={36} style={{ margin: '0 auto 14px', color: 'var(--text3)', opacity: 0.4 }} />
               <p style={{ color: 'var(--text3)', fontSize: 15 }}>No signals yet. Run a deep scan.</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {signals.map((sig, i) => {
-                const sc = sourceColors[sig.source] || { bg: 'rgba(255,255,255,0.05)', color: 'var(--text3)' }
-                return (
-                  <motion.div key={sig.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
-                    className="glass" style={{ borderRadius: 12, padding: 18 }}>
-                    <p style={{ fontSize: 14, color: 'var(--text1)', marginBottom: 10, lineHeight: 1.5 }}>{sig.headline}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color, fontFamily: 'var(--font-mono)' }}>{sig.source}</span>
-                      {sig.score_contribution > 0 && (
-                        <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--teal-glow)', color: 'var(--teal)', fontFamily: 'var(--font-mono)' }}>+{sig.score_contribution} pts</span>
-                      )}
-                      <span style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)' }}><Clock size={11} /> {timeAgo(sig.fetched_at)}</span>
-                      {sig.url && (
-                        <a href={sig.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', marginLeft: 'auto' }}>
-                          <ExternalLink size={11} /> View Source
-                        </a>
-                      )}
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          )}
-          {macroEvents.length > 0 && (
-            <>
-              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: 10, marginTop: 28, marginBottom: 18 }}>
-                <Globe size={20} style={{ color: 'var(--coral)' }} /> Macro Events
-              </h2>
-              {macroEvents.map(e => (
-                <div key={e.id} className="glass" style={{ borderRadius: 12, padding: 18, borderLeft: '3px solid var(--coral)', marginBottom: 10 }}>
-                  <p style={{ fontSize: 14, color: 'var(--text1)', marginBottom: 6 }}>{e.title}</p>
-                  <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{e.source}</span>
+            (() => {
+              // Group signals by date category
+              const now = new Date()
+              const categories = [
+                { label: 'Past Week', maxDays: 7 },
+                { label: 'Past 3 Weeks', maxDays: 21 },
+                { label: 'Past Month', maxDays: 30 },
+                { label: 'Past 3 Months', maxDays: 90 },
+                { label: 'Older', maxDays: Infinity },
+              ]
+              const grouped = categories.map(cat => ({
+                ...cat,
+                signals: signals.filter(sig => {
+                  const days = sig.fetched_at ? Math.floor((now - new Date(sig.fetched_at)) / (1000*60*60*24)) : 999
+                  const prevMax = categories[categories.indexOf(cat) - 1]?.maxDays || 0
+                  return days >= prevMax && days < cat.maxDays
+                })
+              })).filter(g => g.signals.length > 0)
+
+              return grouped.map(group => (
+                <div key={group.label} style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, paddingLeft: 4 }}>
+                    {group.label} · {group.signals.length} signal{group.signals.length !== 1 ? 's' : ''}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {group.signals.map((sig, i) => {
+                      const sc = sourceColors[sig.source] || { bg: 'rgba(255,255,255,0.05)', color: 'var(--text3)' }
+                      return (
+                        <motion.div key={sig.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
+                          className="glass" style={{ borderRadius: 12, padding: 18 }}>
+                          <p style={{ fontSize: 14, color: 'var(--text1)', marginBottom: 10, lineHeight: 1.5 }}>{sig.headline}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color, fontFamily: 'var(--font-mono)' }}>{sig.source}</span>
+                            {sig.score_contribution > 0 && (
+                              <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--teal-glow)', color: 'var(--teal)', fontFamily: 'var(--font-mono)' }}>+{sig.score_contribution} pts</span>
+                            )}
+                            <span style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)' }}><Clock size={11} /> {timeAgo(sig.fetched_at)}</span>
+                            {sig.url && (
+                              <a href={sig.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', marginLeft: 'auto' }}>
+                                <ExternalLink size={11} /> View Source
+                              </a>
+                            )}
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
                 </div>
-              ))}
-            </>
+              ))
+            })()
           )}
         </div>
 
-        {/* AI Analysis — structured into 3 sections */}
+        {/* Right column: AI Analysis + Macro Events */}
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', marginBottom: 18 }}>AI Analysis</h2>
           {company.alignment_reason ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { title: '📡 What they launched', color: 'var(--teal-glow)', border: 'rgba(0,212,164,0.15)' },
-                { title: '🎯 Why Blostem fits', color: 'var(--purple-glow)', border: 'rgba(123,110,255,0.15)' },
-                { title: '💡 Recommended angle', color: 'var(--amber-glow)', border: 'rgba(255,179,64,0.15)' },
+                { title: '📡 What they launched', border: 'rgba(0,212,164,0.15)' },
+                { title: '🎯 Why Blostem fits', border: 'rgba(123,110,255,0.15)' },
+                { title: '💡 Recommended angle', border: 'rgba(255,179,64,0.15)' },
+                { title: '⚠️ Risk & compliance notes', border: 'rgba(255,80,64,0.15)' },
               ].map((section, i) => {
                 const lines = company.alignment_reason.split(/\n+/).filter(Boolean)
                 const text = lines[i] || (i === 0 ? company.alignment_reason : '')
@@ -311,6 +356,21 @@ export default function CompanyDetailPage() {
               </p>
             </div>
           )}
+
+          {/* Macro Events — moved below AI Analysis */}
+          {macroEvents.length > 0 && (
+            <>
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: 10, marginTop: 28, marginBottom: 18 }}>
+                <Globe size={20} style={{ color: 'var(--coral)' }} /> Macro Events
+              </h2>
+              {macroEvents.map(e => (
+                <div key={e.id} className="glass" style={{ borderRadius: 12, padding: 18, borderLeft: '3px solid var(--coral)', marginBottom: 10 }}>
+                  <p style={{ fontSize: 14, color: 'var(--text1)', marginBottom: 6 }}>{e.title}</p>
+                  <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{e.source}</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -321,7 +381,7 @@ export default function CompanyDetailPage() {
           {scanning ? <RefreshCw size={16} className="animate-spin" /> : <ScanSearch size={16} />}
           {scanning ? 'Scanning...' : 'Deep Scan'}
         </button>
-        <button onClick={() => navigate('/app/radar')} className="btn-secondary"><ArrowLeft size={16} /> Back</button>
+
       </div>
     </div>
   )

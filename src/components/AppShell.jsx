@@ -44,7 +44,7 @@ function ScrollProgress({ containerRef }) {
 /* ─── Blostem Logo SVG ─────────────────────── */
 function BlostemLogo() {
   return (
-    <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+    <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
       <defs>
         <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32">
           <stop offset="0%" stopColor="#0A7A60" />
@@ -68,8 +68,15 @@ export default function AppShell() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const mainRef = useRef(null)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const initials = user?.email?.slice(0, 2).toUpperCase() || 'BP'
+  // Derive first name from email (e.g. pranjalv961@gmail.com → Pranjal)
+  const firstName = (() => {
+    const prefix = user?.email?.split('@')[0] || 'User'
+    const clean = prefix.replace(/[0-9._]/g, ' ').trim().split(' ')[0]
+    return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase()
+  })()
 
   const handleLogout = async () => {
     await signOut()
@@ -87,8 +94,8 @@ export default function AppShell() {
           <div className="sb-logo-wrap">
             <BlostemLogo />
             <div className="sb-brand">
-              <span className="sb-brand-name">blostem</span>
-              <span className="sb-brand-sub">Pulse</span>
+              <span className="sb-brand-name">Blostem</span>
+              <span className="sb-brand-sub">PULSE</span>
             </div>
           </div>
 
@@ -108,13 +115,13 @@ export default function AppShell() {
           </div>
 
           <div className="sb-bottom">
-            <button onClick={handleLogout} className="sb-item" title="Logout">
+            <button onClick={() => setShowLogoutConfirm(true)} className="sb-item" title="Logout">
               <LogOut size={18} />
               <span className="sb-item-label">Log out</span>
             </button>
             <div className="sb-user">
               <div className="sb-user-avatar">{initials}</div>
-              <span className="sb-user-email">{user?.email}</span>
+              <span className="sb-user-email">{firstName}</span>
             </div>
           </div>
         </nav>
@@ -126,6 +133,25 @@ export default function AppShell() {
       </div>
 
       <ScrollProgress containerRef={mainRef} />
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}
+          onClick={() => setShowLogoutConfirm(false)}>
+          <div className="glass" style={{ padding: 32, borderRadius: 16, maxWidth: 380, width: '90%', textAlign: 'center' }}
+            onClick={e => e.stopPropagation()}>
+            <LogOut size={32} style={{ color: 'var(--coral)', margin: '0 auto 16px' }} />
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text1)', marginBottom: 8 }}>Log out?</h3>
+            <p style={{ fontSize: 14, color: 'var(--text3)', marginBottom: 24 }}>Are you sure you want to log out of BlostemPulse?</p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button onClick={() => setShowLogoutConfirm(false)} className="btn-secondary">Cancel</button>
+              <button onClick={handleLogout} style={{ padding: '10px 24px', borderRadius: 'var(--radius)', background: 'var(--coral)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <LogOut size={16} /> Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
