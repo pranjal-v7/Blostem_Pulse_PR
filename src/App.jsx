@@ -9,6 +9,7 @@ import CompanyDetailPage from './pages/CompanyDetailPage'
 import OutreachPage from './pages/OutreachPage'
 import SettingsPage from './pages/SettingsPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import NotFoundPage from './pages/NotFoundPage'
 import { Loader2 } from 'lucide-react'
 
 function ProtectedRoute({ children }) {
@@ -50,7 +51,7 @@ function AppRoutes() {
         <Route path="settings" element={<SettingsPage />} />
         <Route index element={<Navigate to="radar" replace />} />
       </Route>
-      <Route path="*" element={<Navigate to={user ? "/app/radar" : "/login"} replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
