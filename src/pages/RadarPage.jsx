@@ -239,6 +239,7 @@ function DiscoveryPanel({ discovered, onClose }) {
 
 
 export default function RadarPage() {
+  const navigate = useNavigate()
   const { prospects, loading, refetch } = useRealtimeProspects()
   const { addToast } = useToast()
   const [macroEvents, setMacroEvents] = useState([])
