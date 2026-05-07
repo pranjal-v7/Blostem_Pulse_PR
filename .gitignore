@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.vercel/
+
+# Environment files — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+.env.production
+*.env
+
+# Supabase local dev
+supabase/.branches/
+supabase/.temp/
+
+# ─── Builder Pack ──────────────────────────────────────────────
+# Contains synthetic PII, proprietary regulatory references,
+# and graded eval sets provided under hackathon NDA.
+# DO NOT push to any public repository.
+Builder Pack/
+
+# OS / Editor noise
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+*.log
