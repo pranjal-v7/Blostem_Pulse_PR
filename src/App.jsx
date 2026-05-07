@@ -51,6 +51,7 @@ function AppRoutes() {
         <Route path="settings" element={<SettingsPage />} />
         <Route index element={<Navigate to="radar" replace />} />
       </Route>
+      <Route path="/" element={<Navigate to="/app" replace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
