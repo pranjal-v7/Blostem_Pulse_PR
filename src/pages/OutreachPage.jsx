@@ -19,6 +19,52 @@ function timeAgo(d) {
   return `${Math.floor(s / 86400)}d idle`
 }
 
+/* ─── Smart Logo with 3-tier fallback ──────────────────────── */
+function OutreachLogo({ name, domain }) {
+  const [stage, setStage] = useState('clearbit') // clearbit → favicon → initials
+
+  const initials = name
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  // Pick a deterministic background colour from the name
+  const palette = ['#0d9488', '#7c3aed', '#b45309', '#0e7490', '#be185d', '#065f46']
+  const colour = palette[name.charCodeAt(0) % palette.length]
+
+  const src =
+    stage === 'clearbit'
+      ? `https://logo.clearbit.com/${domain}`
+      : `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+
+  return (
+    <div style={{
+      width: 34, height: 34, borderRadius: 8,
+      background: stage === 'initials' ? colour : '#ffffff',
+      border: '1px solid var(--border)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0, overflow: 'hidden'
+    }}>
+      {stage === 'initials' ? (
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{initials}</span>
+      ) : (
+        <img
+          src={src}
+          alt={name}
+          style={{ width: 22, height: 22, objectFit: 'contain' }}
+          onError={() => {
+            if (stage === 'clearbit') setStage('favicon')
+            else setStage('initials')
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+
 export default function OutreachPage() {
   const [searchParams] = useSearchParams()
   const { session } = useAuth()
@@ -37,16 +83,26 @@ export default function OutreachPage() {
   const [filter, setFilter] = useState('all')
 
   useEffect(() => {
-    async function fetch() {
+    async function fetchProspects() {
       const { data } = await supabase.from('prospects').select('*').order('intent_score', { ascending: false })
-      setProspects(data || [])
+      // Deduplicate by name — keep highest intent_score row for each company
+      const seen = new Map()
+      for (const p of (data || [])) {
+        const key = p.name.toLowerCase().trim()
+        const existing = seen.get(key)
+        if (!existing || (p.intent_score ?? -1) > (existing.intent_score ?? -1)) {
+          seen.set(key, p)
+        }
+      }
+      const deduped = Array.from(seen.values()).sort((a, b) => (b.intent_score ?? 0) - (a.intent_score ?? 0))
+      setProspects(deduped)
       const preselect = searchParams.get('company_id')
       if (preselect && data) {
-        const found = data.find(p => p.id === preselect)
+        const found = deduped.find(p => p.id === preselect)
         if (found) setSelected(found)
       }
     }
-    fetch()
+    fetchProspects()
   }, [searchParams])
 
   const filteredProspects = prospects.filter(p => {
@@ -330,7 +386,7 @@ export default function OutreachPage() {
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {filteredProspects.map(p => {
-            const domain = p.website?.replace(/^https?:\/\//, '').replace(/\/$/, '')
+            const domain = p.website?.replace(/^https?:\/\//, '').replace(/\/$/, '') || `${p.name.toLowerCase().replace(/\s+/g, '')}.com`
             return (
             <button key={p.id} onClick={() => setSelected(p)}
               style={{
@@ -340,9 +396,7 @@ export default function OutreachPage() {
                 borderLeft: selected?.id === p.id ? '3px solid var(--teal)' : '3px solid transparent',
               }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#ffffff', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                  <img src={`https://logo.clearbit.com/${domain}`} alt="" style={{ width: 22, height: 22, objectFit: 'contain' }} onError={e => { e.target.style.display = 'none' }} />
-                </div>
+                <OutreachLogo name={p.name} domain={domain} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
