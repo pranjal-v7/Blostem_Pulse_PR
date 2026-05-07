@@ -5,7 +5,7 @@ import { useRealtimeProspects } from '../hooks/useRealtimeProspects'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Search, Pencil, X, Loader2, Zap, Radio, Info } from 'lucide-react'
+import { Search, Pencil, X, Loader2, Zap, Radio, Info, Sparkles, CheckCircle, Trash2, ExternalLink } from 'lucide-react'
 
 function timeAgo(date) {
   if (!date) return 'No data'
@@ -169,6 +169,122 @@ function ProspectCard({ prospect, index, onDeepScan, scanningId }) {
   )
 }
 
+/* ─── Review Modal — Autonomous Discovery ─────────────────── */
+function ReviewModal({ prospects: unvalidated, onClose, onAdd, onSkip, addingId, skippingId }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 200, padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="glass"
+        style={{ width: '100%', maxWidth: 580, borderRadius: 18, padding: 28, maxHeight: '80vh', overflowY: 'auto' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+          <Sparkles size={20} style={{ color: 'var(--amber)' }} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text1)', flex: 1 }}>
+            New Prospects Discovered
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 22, lineHeight: 1.6 }}>
+          These company names were extracted from Inc42, ETBFSI, and other feeds.
+          Add them to your pipeline or skip — no manual data entry needed.
+        </p>
+
+        {/* List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {unvalidated.map(p => (
+            <div key={p.id} style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid var(--border)',
+              borderRadius: 12, padding: '14px 16px',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Initials avatar */}
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: 'rgba(255,180,0,0.1)',
+                  border: '1px solid rgba(255,180,0,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 700, color: 'var(--amber)', flexShrink: 0,
+                }}>
+                  {p.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)' }}>{p.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
+                    Extracted from {p.discovery_source || 'RSS feed'}
+                  </div>
+                </div>
+              </div>
+              {/* Source headline */}
+              {p.discovery_headline && (
+                <div style={{
+                  fontSize: 12, color: 'var(--text2)', fontStyle: 'italic',
+                  borderLeft: '2px solid var(--border)', paddingLeft: 10, lineHeight: 1.5,
+                }}>
+                  "{p.discovery_headline.slice(0, 140)}{p.discovery_headline.length > 140 ? '…' : ''}"
+                </div>
+              )}
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                <button
+                  onClick={() => onAdd(p)}
+                  disabled={addingId === p.id || skippingId === p.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                    cursor: 'pointer', border: '1px solid var(--teal)',
+                    background: addingId === p.id ? 'rgba(0,212,164,0.15)' : 'rgba(0,212,164,0.08)',
+                    color: 'var(--teal)', transition: 'all 0.2s',
+                  }}
+                >
+                  {addingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
+                  {addingId === p.id ? 'Adding…' : 'Add to Pipeline'}
+                </button>
+                <button
+                  onClick={() => onSkip(p)}
+                  disabled={addingId === p.id || skippingId === p.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                    cursor: 'pointer', border: '1px solid var(--border)',
+                    background: 'transparent', color: 'var(--text3)', transition: 'all 0.2s',
+                  }}
+                >
+                  {skippingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  Skip
+                </button>
+              </div>
+            </div>
+          ))}
+          {unvalidated.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)', fontSize: 14 }}>
+              All caught up — no new prospects to review.
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 export default function RadarPage() {
   const { prospects, loading, refetch } = useRealtimeProspects()
   const { addToast } = useToast()
@@ -177,6 +293,10 @@ export default function RadarPage() {
   const [scanningId, setScanningId] = useState(null)
   const [scanAllRunning, setScanAllRunning] = useState(false)
   const [scanAllProgress, setScanAllProgress] = useState({ done: 0, total: 0 })
+  const [showReviewModal, setShowReviewModal] = useState(false)
+  const [unvalidatedProspects, setUnvalidatedProspects] = useState([])
+  const [addingId, setAddingId] = useState(null)
+  const [skippingId, setSkippingId] = useState(null)
   const [dismissedEvents, setDismissedEvents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dismissedEvents') || '[]') }
     catch { return [] }
@@ -235,6 +355,75 @@ export default function RadarPage() {
     }
     fetchEvents()
   }, [])
+
+  // ── Fetch + subscribe to unvalidated (discovered) prospects ──
+  useEffect(() => {
+    async function fetchUnvalidated() {
+      const { data } = await supabase
+        .from('prospects')
+        .select('id, name, discovery_source, discovery_headline')
+        .eq('needs_validation', true)
+        .order('created_at', { ascending: false })
+      setUnvalidatedProspects(data || [])
+    }
+    fetchUnvalidated()
+
+    // Realtime subscription — badge updates instantly when fetch-signals runs
+    const channel = supabase
+      .channel('unvalidated-prospects')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'prospects',
+        filter: 'needs_validation=eq.true',
+      }, () => fetchUnvalidated())
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [])
+
+  // ── Add discovered prospect to pipeline ──────────────────────
+  const handleAddDiscovered = async (prospect) => {
+    setAddingId(prospect.id)
+    try {
+      // Mark as validated + is_new_entrant
+      await supabase
+        .from('prospects')
+        .update({ needs_validation: false, is_new_entrant: true, sector: 'Fintech', stage: 'Unknown', hq_city: 'India' })
+        .eq('id', prospect.id)
+
+      // Trigger intent scoring for this new company
+      try {
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/score-intent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ company_id: prospect.id }),
+          }
+        )
+      } catch { /* score runs async, non-fatal */ }
+
+      setUnvalidatedProspects(prev => prev.filter(p => p.id !== prospect.id))
+      addToast(`${prospect.name} added to pipeline — scoring now…`, 'success')
+    } catch (err) {
+      addToast(err.message, 'error')
+    }
+    setAddingId(null)
+  }
+
+  // ── Skip (delete) discovered prospect ───────────────────────
+  const handleSkipDiscovered = async (prospect) => {
+    setSkippingId(prospect.id)
+    try {
+      await supabase.from('prospects').delete().eq('id', prospect.id)
+      setUnvalidatedProspects(prev => prev.filter(p => p.id !== prospect.id))
+      addToast(`${prospect.name} skipped`, 'info')
+    } catch (err) {
+      addToast(err.message, 'error')
+    }
+    setSkippingId(null)
+  }
 
   const dismissEvent = (id) => {
     const updated = [...dismissedEvents, id]
@@ -367,6 +556,23 @@ export default function RadarPage() {
         <button className="icp-btn" onClick={openIcpModal}>
           <Pencil size={14} /> Edit ICP
         </button>
+
+        {/* 🔍 Discovery badge — shows when new prospects are found */}
+        {unvalidatedProspects.length > 0 && (
+          <button
+            onClick={() => setShowReviewModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', border: '1px solid rgba(255,180,0,0.4)',
+              background: 'rgba(255,180,0,0.08)', color: 'var(--amber)',
+              animation: 'pulse-amber 2s ease-in-out infinite',
+            }}
+          >
+            <Sparkles size={15} />
+            {unvalidatedProspects.length} New Prospect{unvalidatedProspects.length > 1 ? 's' : ''} Found
+          </button>
+        )}
 
         {/* 🔥 SCAN ALL — Dedicated Real-Time Scan Button */}
         <button
@@ -532,6 +738,20 @@ export default function RadarPage() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Review Modal — Autonomous Discovery */}
+      <AnimatePresence>
+        {showReviewModal && (
+          <ReviewModal
+            prospects={unvalidatedProspects}
+            onClose={() => setShowReviewModal(false)}
+            onAdd={handleAddDiscovered}
+            onSkip={handleSkipDiscovered}
+            addingId={addingId}
+            skippingId={skippingId}
+          />
         )}
       </AnimatePresence>
     </>

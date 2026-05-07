@@ -132,6 +132,31 @@ Scoring framework:
 Return ONLY valid JSON. No explanation. No markdown. Start with { and end with }.`;
 }
 
+// ─── 4. ENTITY EXTRACTION PROMPT ─────────────────────────────
+// Used by fetch-signals to extract NEW Indian fintech company names
+// from RSS headlines for autonomous prospect discovery.
+// Returns a JSON array of strings (company names only).
+
+export function entityExtractionSystemPrompt(): string {
+  return `You are a named-entity recognition engine specialised in Indian fintech.
+Your only job is to extract company names from news headlines.
+Return ONLY a valid JSON array of strings. No explanation. No markdown. Start with [ and end with ].`;
+}
+
+export function entityExtractionUserPrompt(headline: string): string {
+  return `Extract Indian fintech, NBFC, neobank, payments, insurtech, or lending company names from this headline.
+
+Rules:
+1. Include ONLY company/startup/brand names (e.g. "Lendora", "ZeBank", "CreditUp", "PhonePe").
+2. EXCLUDE: people names, city names, RBI/SEBI/government bodies, generic words (fintech, startup, bank).
+3. If no qualifying company name exists in the headline, return [].
+4. Return each name exactly as it appears in the headline.
+
+Headline: "${headline}"
+
+Return ONLY a JSON array, e.g. ["CompanyA", "CompanyB"] or [].`;
+}
+
 export function scoreUserPrompt(ctx: ScoreCtx): string {
   return `Score this Indian fintech company's purchase intent for Blostem's compliance & onboarding automation platform.
 

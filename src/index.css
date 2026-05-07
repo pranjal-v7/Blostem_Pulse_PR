@@ -345,6 +345,12 @@ html, body, #root {
 }
 @keyframes newPulse { 0%,100%{border-color:rgba(123,110,255,0.3)} 50%{border-color:rgba(123,110,255,0.6)} }
 
+/* Discovery badge pulse */
+@keyframes pulse-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,179,64,0); border-color: rgba(255,180,0,0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(255,179,64,0.12); border-color: rgba(255,180,0,0.7); }
+}
+
 /* signal dots */
 .signal-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
 .sig-line { display: flex; gap: 5px; align-items: center; }
