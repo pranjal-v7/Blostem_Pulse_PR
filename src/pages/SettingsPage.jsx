@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 import { motion } from 'framer-motion'
@@ -17,6 +18,7 @@ const DEMO_SIGNALS = [
 export default function SettingsPage() {
   const { user } = useAuth()
   const { addToast } = useToast()
+  const { theme, setTheme } = useTheme()
   const [profile, setProfile] = useState({ icp_definition: '', company_type: '', stage_filter: [], geography: '', scan_frequency: '2x_daily' })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -31,7 +33,6 @@ export default function SettingsPage() {
   const fileInputRef = useRef(null)
 
   // Preferences
-  const [theme, setTheme] = useState('dark')
   const [notifications, setNotifications] = useState(true)
   const [timezone, setTimezone] = useState('Asia/Kolkata')
 

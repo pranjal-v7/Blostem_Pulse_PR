@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { ToastProvider } from './components/Toast'
 import AppShell from './components/AppShell'
 import LoginPage from './pages/LoginPage'
@@ -15,7 +16,7 @@ import { Loader2 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 function ProtectedRoute({ children }) {
-  const { user, loading, needsOnboarding } = useAuth()
+  const { user, loading } = useAuth()
 
   if (loading) {
     return (
@@ -26,7 +27,6 @@ function ProtectedRoute({ children }) {
   }
 
   if (!user) return <Navigate to="/login" replace />
-  if (needsOnboarding) return <Navigate to="/onboarding" replace />
   return children
 }
 
@@ -97,11 +97,13 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <AppRoutes />
-        </ToastProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

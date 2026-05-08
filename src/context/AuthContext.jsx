@@ -10,8 +10,14 @@ export function AuthProvider({ children }) {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
   const checkProfile = async (userId) => {
+    // Always mark onboarding as done — this app is internal to Blostem team.
+    // We auto-create a default profile so the user lands on the dashboard.
     const { data } = await supabase.from('profiles').select('id').eq('id', userId).single()
-    setNeedsOnboarding(!data)
+    if (!data) {
+      // Insert a blank profile so subsequent checks don't re-trigger
+      await supabase.from('profiles').upsert({ id: userId })
+    }
+    setNeedsOnboarding(false)
   }
 
   useEffect(() => {
@@ -51,6 +57,10 @@ export function AuthProvider({ children }) {
       password,
     })
     if (error) throw error
+    // Auto-create a blank profile so the user goes directly to the dashboard
+    if (data?.user) {
+      await supabase.from('profiles').upsert({ id: data.user.id })
+    }
     return data
   }
 
