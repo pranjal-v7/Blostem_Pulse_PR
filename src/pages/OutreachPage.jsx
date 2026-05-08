@@ -5,8 +5,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../components/Toast'
 import {
-  Mail, Shield, ShieldCheck, ShieldAlert, Wand2, ExternalLink,
-  Search, Clock, Activity, Loader2, CheckCircle, AlertTriangle
+  Mail, ShieldCheck, ShieldAlert, Wand2, ExternalLink,
+  Search, Clock, Loader2, CheckCircle, Copy, Send
 } from 'lucide-react'
 
 const STAKEHOLDERS = ['CTO', 'CFO', 'Compliance Head', 'Founder']
@@ -81,6 +81,7 @@ export default function OutreachPage() {
   const [isCheckingCompliance, setIsCheckingCompliance] = useState(false)
   const [isFixing, setIsFixing] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     async function fetchProspects() {
@@ -135,55 +136,69 @@ export default function OutreachPage() {
     setComplianceResult(null)
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-email`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ company_id: selected.id, stakeholder, tone }),
-        }
-      )
+      let fullText = ''
+      let extractedSubject = false // local flag — avoids stale closure reads
+
+      let response
+      try {
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-email`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({ company_id: selected.id, stakeholder, tone }),
+          }
+        )
+      } catch (fetchErr) {
+        throw new Error(`Network error: ${fetchErr.message}`)
+      }
 
       if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Generation failed')
+        let errMsg = 'Generation failed'
+        try {
+          const errData = await response.json()
+          errMsg = errData.error || errMsg
+        } catch { /* response wasn't JSON */ }
+        throw new Error(errMsg)
       }
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
-      let fullText = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        const chunk = decoder.decode(value)
+        const chunk = decoder.decode(value, { stream: true })
         const lines = chunk.split('\n')
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6))
-              if (data.type === 'content_block_delta') {
+              if (data.type === 'content_block_delta' && data.delta?.text) {
                 fullText += data.delta.text
-                if (!subjectLine && fullText.includes('\n')) {
-                  const parts = fullText.split('\n')
-                  setSubjectLine(parts[0].replace(/^Subject:\s*/i, ''))
+                // Use local flag — not stale `subjectLine` state
+                if (!extractedSubject && fullText.includes('\n')) {
+                  const firstNL = fullText.indexOf('\n')
+                  const subject = fullText.slice(0, firstNL).replace(/^Subject:\s*/i, '')
+                  setSubjectLine(subject)
+                  extractedSubject = true
                 }
                 setEmailBody(fullText)
               }
-            } catch { /* skip malformed chunks */ }
+            } catch { /* skip malformed SSE chunks */ }
           }
         }
       }
 
-      if (!subjectLine && fullText.includes('\n')) {
-        const firstNewline = fullText.indexOf('\n')
-        setSubjectLine(fullText.slice(0, firstNewline).replace(/^Subject:\s*/i, ''))
-        const body = fullText.slice(firstNewline).trim()
-        setEmailBody(body)
-        fullText = body
+      // Final pass: ensure subject is extracted even if newline came in last chunk
+      if (!extractedSubject && fullText.includes('\n')) {
+        const firstNL = fullText.indexOf('\n')
+        setSubjectLine(fullText.slice(0, firstNL).replace(/^Subject:\s*/i, ''))
+        fullText = fullText.slice(firstNL).trim()
+        setEmailBody(fullText)
       }
 
       addToast('Email generated successfully', 'success')
@@ -191,10 +206,16 @@ export default function OutreachPage() {
       setTimeout(() => checkCompliance(fullText), 500)
     } catch (err) {
       console.warn('Edge Function failed, using fallback:', err.message)
-      const fallbackBody = await generateEmailFallback()
-      addToast('Email generated (offline mode)', 'success')
-      setIsGenerating(false)
-      setTimeout(() => checkCompliance(fallbackBody), 500)
+      try {
+        const fallbackBody = await generateEmailFallback()
+        addToast('Email generated (offline mode)', 'success')
+        setIsGenerating(false)
+        setTimeout(() => checkCompliance(fallbackBody), 500)
+      } catch (fallbackErr) {
+        console.error('Fallback email generation also failed:', fallbackErr)
+        addToast('Failed to generate email. Please try again.', 'error')
+        setIsGenerating(false)
+      }
     }
   }
 
@@ -225,10 +246,16 @@ export default function OutreachPage() {
     },
     {
       code: 'V5',
-      pattern: /\b(past performance|historical returns?|previously delivered|delivered \d+%)\b/gi,
+      // Only flag if the past-performance phrase is NOT already followed by the disclaimer
+      pattern: /\b(past performance|historical returns?|previously delivered|delivered \d+%)\b(?![\s\S]*?not indicative of future results)/gi,
       rule_violated: 'V5: Past performance cited without disclaimer',
       rule_source: 'SEBI MF Regulations — Scheme Advertisement Guidelines',
-      fix: (s) => s + ' (Past performance is not indicative of future results.)',
+      fix: (s) => {
+        const disclaimer = '(Past performance is not indicative of future results.)'
+        // Don't add if already present
+        if (s.includes(disclaimer) || s.includes('not indicative of future results')) return s
+        return s + '\n\n' + disclaimer
+      },
     },
     {
       code: 'V7',
@@ -269,17 +296,24 @@ export default function OutreachPage() {
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-compliance`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
           body: JSON.stringify({ email_body: textToCheck }),
         }
       )
+      // If the edge function is unavailable/unauthorized, fall back to client-side check
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setComplianceResult(data)
-      if (data.passed) {
+      // Normalise shape — always ensure flags is an array
+      const result = { passed: data.passed ?? true, flags: Array.isArray(data.flags) ? data.flags : [] }
+      setComplianceResult(result)
+      if (result.passed) {
         addToast('Compliance check passed', 'success')
       } else {
-        addToast(`${data.flags?.length || 0} compliance issue(s) found`, 'warning')
+        addToast(`${result.flags.length} compliance issue(s) found`, 'warning')
       }
     } catch (err) {
       console.warn('Compliance Edge Function failed, using deterministic fallback:', err.message)
@@ -303,28 +337,61 @@ export default function OutreachPage() {
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-fix-compliance`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
           body: JSON.stringify({ email_body: emailBody, flags: complianceResult.flags }),
         }
       )
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+      if (!data.fixed_email_body) throw new Error('Empty response from auto-fix')
       setEmailBody(data.fixed_email_body)
       addToast('Email auto-fixed!', 'success')
+      setIsFixing(false)
       setTimeout(() => checkCompliance(data.fixed_email_body), 500)
     } catch (err) {
-      console.warn('Auto-fix Edge Function failed, using fallback:', err.message)
+      console.warn('Auto-fix Edge Function failed, using client-side fallback:', err.message)
+      // Apply each rule's regex fix() directly on the full email body — robust, no substring matching
       let fixed = emailBody
-      complianceResult.flags.forEach(f => { fixed = fixed.replace(f.sentence, f.suggested_fix) })
+      for (const rule of COMPLIANCE_RULES) {
+        rule.pattern.lastIndex = 0
+        fixed = rule.fix(fixed)
+        rule.pattern.lastIndex = 0
+      }
       setEmailBody(fixed)
-      setComplianceResult({ passed: true, flags: [] })
-      addToast('Email auto-fixed and compliant', 'success')
+      addToast('Email auto-fixed (offline mode)', 'success')
+      setIsFixing(false)
+      // Re-run compliance check on the fixed text so the panel updates
+      setTimeout(() => checkCompliance(fixed), 400)
     }
-    setIsFixing(false)
   }
 
   const openInGmail = () => {
-    window.open(`mailto:?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(emailBody)}`)
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(emailBody)}`
+    window.open(gmailUrl, '_blank')
+  }
+
+  const copyEmail = async () => {
+    const fullText = subjectLine
+      ? `Subject: ${subjectLine}\n\n${emailBody}`
+      : emailBody
+    try {
+      await navigator.clipboard.writeText(fullText)
+    } catch {
+      // fallback for non-https or older browsers
+      const el = document.createElement('textarea')
+      el.value = fullText
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+    setCopied(true)
+    addToast('Email copied to clipboard!', 'success')
+    setTimeout(() => setCopied(false), 2500)
   }
 
   const markContacted = async () => {
@@ -477,15 +544,67 @@ export default function OutreachPage() {
             {(emailBody || isGenerating) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {subjectLine && (
-                  <div className="glass" style={{ borderRadius: 10, padding: '12px 20px' }}>
-                    <span style={{ fontSize: 12, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>Subject: </span>
-                    <span style={{ fontSize: 14, color: '#ffffff' }}>{subjectLine}</span>
+                  <div className="glass" style={{ borderRadius: 10, padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>Subject: </span>
+                      <span style={{ fontSize: 14, color: '#ffffff' }}>{subjectLine}</span>
+                    </div>
                   </div>
                 )}
                 <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)}
                   className={`input-field ${isGenerating ? 'streaming-cursor' : ''}`}
                   style={{ minHeight: 300, fontSize: 14, lineHeight: 1.7, resize: 'vertical' }}
                   readOnly={isGenerating} />
+
+                {/* ── Action bar: Copy + Gmail — visible as soon as email exists ── */}
+                {emailBody && !isGenerating && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 12,
+                    }}
+                  >
+                    {/* Copy Email */}
+                    <button
+                      onClick={copyEmail}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                        padding: '14px 20px', borderRadius: 12, cursor: 'pointer',
+                        border: `1px solid ${copied ? 'rgba(0,212,164,0.4)' : 'rgba(0,212,164,0.15)'}`,
+                        background: copied ? 'rgba(0,212,164,0.12)' : 'rgba(0,212,164,0.05)',
+                        color: copied ? 'var(--teal)' : '#ffffff',
+                        fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {copied
+                        ? <><CheckCircle size={16} style={{ color: 'var(--teal)' }} /> Copied!</>
+                        : <><Copy size={16} /> Copy Email</>}
+                    </button>
+
+                    {/* Send in Gmail */}
+                    <button
+                      onClick={openInGmail}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                        padding: '14px 20px', borderRadius: 12, cursor: 'pointer',
+                        border: '1px solid rgba(123,110,255,0.2)',
+                        background: 'rgba(123,110,255,0.07)',
+                        color: '#ffffff',
+                        fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(123,110,255,0.14)'; e.currentTarget.style.borderColor = 'rgba(123,110,255,0.35)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(123,110,255,0.07)'; e.currentTarget.style.borderColor = 'rgba(123,110,255,0.2)' }}
+                    >
+                      <Send size={16} /> Send in Gmail
+                    </button>
+                  </motion.div>
+                )}
               </div>
             )}
 
@@ -505,9 +624,9 @@ export default function OutreachPage() {
                 ) : (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--coral)', marginBottom: 16 }}>
-                      <ShieldAlert size={22} /> <span style={{ fontSize: 15, fontWeight: 600 }}>⚠ {complianceResult.flags.length} Issue{complianceResult.flags.length > 1 ? 's' : ''} Found</span>
+                      <ShieldAlert size={22} /> <span style={{ fontSize: 15, fontWeight: 600 }}>⚠ {complianceResult?.flags?.length ?? 0} Issue{(complianceResult?.flags?.length ?? 0) > 1 ? 's' : ''} Found</span>
                     </div>
-                    {complianceResult.flags.map((f, i) => (
+                    {(complianceResult?.flags ?? []).map((f, i) => (
                       <div key={i} style={{ background: 'var(--coral-glow)', borderRadius: 10, padding: 16, marginBottom: 10, border: '1px solid rgba(255,80,64,0.15)' }}>
                         <p style={{ fontSize: 13, color: '#FF8070', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>"{f.sentence}"</p>
                         <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 4 }}>Rule: {f.rule_violated}</p>
@@ -526,11 +645,12 @@ export default function OutreachPage() {
               </motion.div>
             )}
 
-            {/* Send actions */}
+            {/* Mark contacted — only after compliance passes */}
             {complianceResult?.passed && emailBody && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', gap: 14 }}>
-                <button onClick={openInGmail} className="btn-primary"><ExternalLink size={16} /> Open in Gmail</button>
-                <button onClick={markContacted} className="btn-secondary"><CheckCircle size={16} /> Mark Contacted</button>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <button onClick={markContacted} className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+                  <CheckCircle size={16} /> Mark as Contacted
+                </button>
               </motion.div>
             )}
           </div>

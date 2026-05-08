@@ -1,0 +1,119 @@
+================================================================
+  BLOSTEMPULSE — 3-MINUTE DEMO VIDEO SCRIPT
+================================================================
+
+
+[0:00 — INTRO]
+
+"Hi everyone, for the Blostem Hack to the Future Hackathon, I tackled 
+a major pain point for the marketing and sales teams: manual prospecting. 
+
+Reps spend hours reading fintech news, guessing which companies are 
+ready to buy, and writing cold outreach from scratch while dodging RBI compliance risks.
+
+My solution is BlostemPulse.
+
+It's an AI-powered platform that autonomously discovers Indian fintech
+prospects, scores their buying intent using Gemini AI, and generates 
+compliant outreach — with zero manual input. Let me show you."
+
+
+[0:20 — LOGIN PAGE]
+[Open: blostem-pulse-pr.vercel.app]
+
+"This is the login page. On the left you can see live stats from the
+platform — companies tracked, hot leads, and RBI alerts — all pulling
+from the live database.
+
+On the right, sign in with email or Google OAuth. New users fill in
+their name, age, and department — and land directly on the dashboard."
+
+[Sign in]
+
+
+[0:40 — RADAR DASHBOARD]
+[Now on /app/radar]
+
+"This is the Prospect Radar — the intelligence feed.
+
+At the top, four KPI tiles: total companies, hot leads, last scan time,
+and active alerts. Next to them is the 'Discover Now' button, which
+manually triggers the autonomous discovery pipeline — scanning 7 Indian
+fintech RSS feeds, extracting company names with Gemini AI, validating
+them via SerpAPI, and inserting them with intent scores.
+
+Below the KPIs are macro alert pills — live RBI and SEBI regulatory
+events that affect the whole pipeline. Dismissible per session.
+
+The prospect list is sorted into three tiers: Hot, Warm, and Cold
+based on AI intent score from 0 to 100.
+
+Each card shows the company logo, sector, funding stage, city, signal
+count, and the score ring. The 'Scan' button on each card triggers a
+deep scan — fresh signals fetched, score recalculated, delta animates
+right on the card.
+
+The 'Scan All Live' button does this for every company at once."
+
+[Click Scan on one card — show delta animation]
+
+
+[1:20 — COMPANY DETAIL]
+[Click a hot lead]
+
+"Clicking a company opens the detail view.
+
+Contact information — CTO email, LinkedIn, and website — fetched live
+using SerpAPI and Gemini AI. No manual research.
+
+Below that, the AI alignment analysis explains exactly why this company
+has this score: what regulatory pressure they're under, what signals
+drove the intent, and why the buying window is open right now.
+
+The signal timeline shows every news headline captured for this company,
+the source, and how much each signal contributed to the final score."
+
+
+[1:50 — OUTREACH PAGE]
+[Navigate to Outreach in sidebar]
+
+"In the Outreach module, you select a company, pick your stakeholder —
+CTO, CFO, Compliance Head, or Founder — and choose the tone.
+
+Hit Generate Email. Gemini streams a personalised email in real time,
+built around this company's actual signals and your ICP.
+
+The platform then auto-checks it against 7 RBI, SEBI, and DPDPA
+compliance rules. Any violation is flagged inline. One click
+on Auto-Fix rewrites only the flagged sentences — same intent,
+fully compliant. Then open directly in Gmail."
+
+[Show streaming email, compliance check, Gmail button]
+
+
+[2:30 — SETTINGS]
+[Navigate to Settings in sidebar]
+
+"Settings lets you update your profile, upload a photo, and set your
+role. The theme toggle switches between dark and light mode instantly —
+persisted across sessions.
+
+The ICP editor defines what kind of company you're targeting. Saving it
+triggers a full AI rescore of every prospect in the pipeline.
+
+Scan frequency controls how often the autonomous pipeline runs —
+two times a day, four times, or manual — managed by a pg_cron job
+running in IST."
+
+
+[2:55 — CLOSE]
+
+"BlostemPulse handles discovery, scoring, contact research, outreach,
+and compliance — automatically. The team just has the conversation.
+
+Live at blostem-pulse-pr.vercel.app."
+
+================================================================
+  RUNTIME: ~3 minutes
+  Pace: speak naturally, don't rush — each section has ~25-35 sec
+================================================================
