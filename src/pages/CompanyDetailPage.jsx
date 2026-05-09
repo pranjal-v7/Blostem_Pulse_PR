@@ -201,13 +201,12 @@ export default function CompanyDetailPage() {
     )
 
     // Source-specific search URL patterns
-    if (['Inc42', 'YourStory', 'Entrackr', 'TechCrunch', 'VCCircle'].includes(sig.source)) {
-      return `${base}/?s=${q}`
-    }
+    if (sig.source === 'YourStory') return `https://yourstory.com/search?q=${q}`
+    if (['Inc42', 'Entrackr', 'TechCrunch', 'VCCircle'].includes(sig.source)) return `${base}/?s=${q}`
     if (sig.source === 'ETBFSI') return `${base}/?s=${q}`
-    if (sig.source === 'Moneycontrol') return `${base}/storypage.php?keyword=${q}`
-    if (sig.source === 'LiveMint') return `${base}/search-result/recentstories?q=${q}`
-    if (sig.source === 'Economic Times') return `${base}/search/site/${q}`
+    if (sig.source === 'Moneycontrol') return `https://www.moneycontrol.com/news/tags/${q}`
+    if (sig.source === 'LiveMint') return `https://www.livemint.com/search#q=${q}`
+    if (sig.source === 'Economic Times') return `https://economictimes.indiatimes.com/searchresult.cms?query=${q}`
     if (sig.source === 'RBI') return `https://www.rbi.org.in/Scripts/BS_SearchResult.aspx?search=${encodeURIComponent(company.name)}`
     if (sig.source === 'deep-scan') return `https://inc42.com/?s=${encodeURIComponent(company.name)}`
     return base
