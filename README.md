@@ -178,7 +178,7 @@ Scheduled Cron (pg_cron, IST)
 ### Frontend
 
 | Technology | Version | Purpose |
-|---|---|---|
+|------------|---------|-------|
 | React | 18.3 | UI framework |
 | React Router | 6.28 | Client-side routing (SPA) |
 | Framer Motion | 11.12 | Animations (score deltas, card entrances, page transitions) |

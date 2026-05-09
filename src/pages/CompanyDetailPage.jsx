@@ -173,6 +173,46 @@ export default function CompanyDetailPage() {
     'VCCircle': { bg: 'rgba(255,200,0,0.15)', color: '#FFC800' },
   }
 
+  // Fallback source URLs — used when a signal has no stored URL
+  const SOURCE_BASE_URLS = {
+    'Inc42': 'https://inc42.com',
+    'ETBFSI': 'https://etbfsi.com',
+    'YourStory': 'https://yourstory.com',
+    'Entrackr': 'https://entrackr.com',
+    'LiveMint': 'https://www.livemint.com',
+    'Moneycontrol': 'https://www.moneycontrol.com',
+    'Economic Times': 'https://economictimes.indiatimes.com',
+    'TechCrunch': 'https://techcrunch.com',
+    'VCCircle': 'https://www.vccircle.com',
+    'RBI': 'https://www.rbi.org.in',
+    'deep-scan': 'https://inc42.com',
+  }
+
+  const getSignalUrl = (sig) => {
+    // Prefer the stored article URL if it's a real HTTP link
+    if (sig.url && sig.url.startsWith('http')) return sig.url
+
+    const base = SOURCE_BASE_URLS[sig.source] || 'https://inc42.com'
+    // Build a search query using the headline (more specific) or company name
+    const q = encodeURIComponent(
+      sig.headline
+        ? sig.headline.slice(0, 80)   // trim to avoid overly long URLs
+        : company.name
+    )
+
+    // Source-specific search URL patterns
+    if (['Inc42', 'YourStory', 'Entrackr', 'TechCrunch', 'VCCircle'].includes(sig.source)) {
+      return `${base}/?s=${q}`
+    }
+    if (sig.source === 'ETBFSI') return `${base}/?s=${q}`
+    if (sig.source === 'Moneycontrol') return `${base}/storypage.php?keyword=${q}`
+    if (sig.source === 'LiveMint') return `${base}/search-result/recentstories?q=${q}`
+    if (sig.source === 'Economic Times') return `${base}/search/site/${q}`
+    if (sig.source === 'RBI') return `https://www.rbi.org.in/Scripts/BS_SearchResult.aspx?search=${encodeURIComponent(company.name)}`
+    if (sig.source === 'deep-scan') return `https://inc42.com/?s=${encodeURIComponent(company.name)}`
+    return base
+  }
+
   return (
     <div style={{ padding: '28px 40px', maxWidth: 960, margin: '0 auto', paddingBottom: 120 }}>
       <button onClick={() => navigate('/app/radar')} style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text3)', fontSize: 14, marginBottom: 28, background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -327,18 +367,20 @@ export default function CompanyDetailPage() {
               // Group signals by date category
               const now = new Date()
               const categories = [
-                { label: 'Past Week', maxDays: 7 },
-                { label: 'Past 3 Weeks', maxDays: 21 },
-                { label: 'Past Month', maxDays: 30 },
-                { label: 'Past 3 Months', maxDays: 90 },
-                { label: 'Older', maxDays: Infinity },
+                { label: 'Past Week', maxDays: 7, minDays: 0 },
+                { label: 'Past 3 Weeks', maxDays: 21, minDays: 7 },
+                { label: 'Past Month', maxDays: 30, minDays: 21 },
+                { label: 'Past 3 Months', maxDays: 90, minDays: 30 },
+                { label: 'Older', maxDays: Infinity, minDays: 90 },
               ]
               const grouped = categories.map(cat => ({
                 ...cat,
                 signals: signals.filter(sig => {
-                  const days = sig.fetched_at ? Math.floor((now - new Date(sig.fetched_at)) / (1000*60*60*24)) : 999
-                  const prevMax = categories[categories.indexOf(cat) - 1]?.maxDays || 0
-                  return days >= prevMax && days < cat.maxDays
+                  // Null / missing fetched_at → treat as just discovered (0 days)
+                  const days = sig.fetched_at
+                    ? Math.floor((now - new Date(sig.fetched_at)) / (1000 * 60 * 60 * 24))
+                    : 0
+                  return days >= cat.minDays && days < cat.maxDays
                 })
               })).filter(g => g.signals.length > 0)
 
@@ -360,11 +402,9 @@ export default function CompanyDetailPage() {
                               <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--teal-glow)', color: 'var(--teal)', fontFamily: 'var(--font-mono)' }}>+{sig.score_contribution} pts</span>
                             )}
                             <span style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)' }}><Clock size={11} /> {timeAgo(sig.fetched_at)}</span>
-                            {sig.url && (
-                              <a href={sig.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', marginLeft: 'auto' }}>
-                                <ExternalLink size={11} /> View Source
-                              </a>
-                            )}
+                            <a href={getSignalUrl(sig)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', marginLeft: 'auto', opacity: 0.9 }}>
+                              <ExternalLink size={11} /> View Source
+                            </a>
                           </div>
                         </motion.div>
                       )
