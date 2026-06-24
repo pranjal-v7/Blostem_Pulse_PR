@@ -9,6 +9,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
+## 🌐 Live Demo
+
+**[https://blostem-pulse-pr.vercel.app](https://blostem-pulse-pr.vercel.app)**
+
+Sign up with any email — you'll land directly on the Radar dashboard. The platform is pre-seeded with real Indian fintech companies (Groww, Zerodha, Navi) to demonstrate live intent scoring.
+
+---
 
 ## 🧩 The Problem
 
@@ -490,12 +497,5 @@ Blostem_Pulse_PR/
 
 ---
 
-## 🌐 Live Demo
-
-**[https://blostem-pulse-pr.vercel.app](https://blostem-pulse-pr.vercel.app)**
-
-Sign up with any email — you'll land directly on the Radar dashboard. The platform is pre-seeded with real Indian fintech companies (Groww, Zerodha, Navi) to demonstrate live intent scoring.
-
----
 
 > Built for the **Blostem × Hack to the Future Hackathon** — turning raw Indian fintech signal noise into zero-touch, RBI/SEBI-compliant sales intelligence.
